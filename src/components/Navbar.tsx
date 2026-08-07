@@ -25,16 +25,16 @@ export function Navbar({
     <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200 text-[#17201D] shadow-xs">
       {/* Progress Bar */}
       {isNavigating && (
-        <div className="absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r from-[#8F1D2C] via-[#741522] to-[#20A878] animate-pulse" />
+        <div className="absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r from-[#8F1D2C] via-[#3B988E] to-[#20A878] animate-pulse" />
       )}
 
       <div className="max-w-4xl mx-auto px-3 sm:px-4 h-16 flex items-center justify-between gap-2">
-        {/* Brand Logo — Logo preserved exactly */}
+        {/* Brand Logo — New MedicoDocs Logo with Medico in Red and Docs in Teal */}
         <Link href={user ? '/dashboard' : '/'} className="flex items-center gap-2 sm:gap-3 min-w-0 group">
           <div className="w-9 h-9 sm:w-10 sm:h-10 relative rounded-xl overflow-hidden shadow-xs border border-slate-200 bg-white flex items-center justify-center shrink-0">
             <Image
               src="/logo.png"
-              alt="MedicoDocs by AB Logo"
+              alt="MedicoDocs Logo"
               width={40}
               height={40}
               className="object-contain group-hover:scale-105 transition-transform"
@@ -43,9 +43,9 @@ export function Navbar({
           </div>
           <div className="min-w-0">
             <h1 className="font-extrabold text-base sm:text-lg tracking-tight leading-none flex items-center gap-1">
-              <span className="text-[#17201D]">Medico</span>
-              <span className="text-[#8F1D2C]">Docs</span>
-              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-[#F8E9EC] text-[#8F1D2C] border border-[#8F1D2C]/20 tracking-normal shrink-0">
+              <span className="text-[#8F1D2C]">Medico</span>
+              <span className="text-[#3B988E]">Docs</span>
+              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-[#E6F4F2] text-[#3B988E] border border-[#3B988E]/20 tracking-normal shrink-0">
                 by AB
               </span>
             </h1>

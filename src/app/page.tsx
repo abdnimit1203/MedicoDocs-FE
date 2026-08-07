@@ -11,7 +11,6 @@ import {
   FileText,
   Users,
   Clock,
-  ArrowRight,
   Loader2,
   LogIn,
   UserPlus,
@@ -57,6 +56,10 @@ export default function Home() {
               </div>
 
               <div className="space-y-2">
+                <div className="text-xs font-bold uppercase tracking-wider text-[#3B988E]">
+                  <span className="text-[#8F1D2C]">Medico</span>
+                  <span className="text-[#3B988E]">Docs</span> by AB
+                </div>
                 <h1 className="text-2xl sm:text-4xl font-extrabold tracking-tight text-[#17201D] leading-tight">
                   Organize Your Medical Records & Prescriptions
                 </h1>
@@ -110,8 +113,8 @@ export default function Home() {
               </div>
 
               {/* Card 2 */}
-              <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-xs space-y-2.5 hover:border-[#20A878]/30 transition-colors">
-                <div className="w-10 h-10 rounded-xl bg-[#E8F7F0] text-[#20A878] flex items-center justify-center font-bold">
+              <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-xs space-y-2.5 hover:border-[#3B988E]/30 transition-colors">
+                <div className="w-10 h-10 rounded-xl bg-[#E6F4F2] text-[#3B988E] flex items-center justify-center font-bold">
                   <ShieldCheck className="w-5 h-5" />
                 </div>
                 <h3 className="font-bold text-sm text-[#17201D]">Secure & Private</h3>
@@ -132,8 +135,8 @@ export default function Home() {
               </div>
 
               {/* Card 4 */}
-              <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-xs space-y-2.5 hover:border-[#20A878]/30 transition-colors">
-                <div className="w-10 h-10 rounded-xl bg-[#E8F7F0] text-[#20A878] flex items-center justify-center font-bold">
+              <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-xs space-y-2.5 hover:border-[#3B988E]/30 transition-colors">
+                <div className="w-10 h-10 rounded-xl bg-[#E6F4F2] text-[#3B988E] flex items-center justify-center font-bold">
                   <Clock className="w-5 h-5" />
                 </div>
                 <h3 className="font-bold text-sm text-[#17201D]">Timeline & History</h3>
@@ -150,7 +153,7 @@ export default function Home() {
       <footer className="mt-12 py-6 border-t border-slate-200 text-center text-xs text-[#68736F]">
         <div className="max-w-4xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-2">
           <p className="font-semibold text-[#17201D]">
-            MedicoDocs <span className="text-xs font-normal text-[#68736F]">by AB</span>
+            <span className="text-[#8F1D2C]">Medico</span><span className="text-[#3B988E]">Docs</span> <span className="text-xs font-normal text-[#68736F]">by AB</span>
           </p>
           <p>© {new Date().getFullYear()} MedicoDocs. Your health. Organized. Secure.</p>
         </div>
