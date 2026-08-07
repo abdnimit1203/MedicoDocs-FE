@@ -17,6 +17,7 @@ import {
   Pill,
   Bot,
   Loader2,
+  FolderPlus,
 } from 'lucide-react'
 
 const RELATIONSHIPS = ['All', 'Self', 'Father', 'Mother', 'Wife', 'Child', 'Sibling', 'Other']
@@ -32,13 +33,12 @@ export default function DashboardPage() {
   const [selectedRelationship, setSelectedRelationship] = useState('All')
   const [selectedCategory, setSelectedCategory] = useState('All')
   const [activeTab, setActiveTab] = useState<'all' | 'prescriptions' | 'timeline'>('all')
-  const [showTimeline, setShowTimeline] = useState(false)
 
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [activeRecord, setActiveRecord] = useState<IMedicalRecord | null>(null)
 
-  // Auth protection guard
+  // Auth Protection Guard
   useEffect(() => {
     if (!authLoading && !user) {
       router.push('/login')
@@ -110,39 +110,36 @@ export default function DashboardPage() {
 
   return (
     <div className="min-h-screen bg-[#F8F9F7] text-[#17201D] font-sans pb-16 w-full max-w-full overflow-x-hidden">
+      {/* Authenticated Application Header */}
       <Navbar
         onOpenCreateModal={() => {
           setActiveRecord(null)
           setIsModalOpen(true)
         }}
         isNavigating={loadingRecords}
+        activeTab={activeTab}
+        onTabChange={(tab) => setActiveTab(tab)}
       />
 
       <main className="max-w-4xl mx-auto px-3 sm:px-4 pt-3 sm:pt-4 space-y-3.5 sm:space-y-4 w-full min-w-0">
-        {/* Quick Feature Bar */}
-        <div className="bg-white p-1 sm:p-1.5 rounded-2xl border border-slate-200 shadow-xs flex items-center justify-between gap-1 overflow-x-auto no-scrollbar w-full min-w-0">
+        {/* Mobile Quick Navigation Bar */}
+        <div className="md:hidden bg-white p-1 sm:p-1.5 rounded-2xl border border-slate-200 shadow-xs flex items-center justify-between gap-1 overflow-x-auto no-scrollbar w-full min-w-0">
           <button
-            onClick={() => {
-              setActiveTab('all')
-              setShowTimeline(false)
-            }}
-            className={`flex-1 min-w-[90px] sm:min-w-[100px] flex items-center justify-center gap-1.5 px-2.5 sm:px-3 py-2 rounded-xl text-xs font-bold transition-all shrink-0 ${
-              activeTab === 'all' && !showTimeline
+            onClick={() => setActiveTab('all')}
+            className={`flex-1 min-w-[90px] flex items-center justify-center gap-1.5 px-2.5 py-2 rounded-xl text-xs font-bold transition-all shrink-0 ${
+              activeTab === 'all'
                 ? 'bg-[#8F1D2C] text-white shadow-xs'
                 : 'text-[#68736F] hover:bg-slate-50'
             }`}
           >
             <FileText className="w-3.5 h-3.5 shrink-0" />
-            <span>All Records</span>
+            <span>Records</span>
           </button>
 
           <button
-            onClick={() => {
-              setActiveTab('prescriptions')
-              setShowTimeline(false)
-            }}
-            className={`flex-1 min-w-[100px] sm:min-w-[110px] flex items-center justify-center gap-1.5 px-2.5 sm:px-3 py-2 rounded-xl text-xs font-bold transition-all shrink-0 ${
-              activeTab === 'prescriptions' && !showTimeline
+            onClick={() => setActiveTab('prescriptions')}
+            className={`flex-1 min-w-[100px] flex items-center justify-center gap-1.5 px-2.5 py-2 rounded-xl text-xs font-bold transition-all shrink-0 ${
+              activeTab === 'prescriptions'
                 ? 'bg-[#8F1D2C] text-white shadow-xs'
                 : 'text-[#68736F] hover:bg-slate-50'
             }`}
@@ -152,12 +149,9 @@ export default function DashboardPage() {
           </button>
 
           <button
-            onClick={() => {
-              setShowTimeline(true)
-              setActiveTab('timeline')
-            }}
-            className={`flex-1 min-w-[90px] sm:min-w-[100px] flex items-center justify-center gap-1.5 px-2.5 sm:px-3 py-2 rounded-xl text-xs font-bold transition-all shrink-0 ${
-              showTimeline
+            onClick={() => setActiveTab('timeline')}
+            className={`flex-1 min-w-[90px] flex items-center justify-center gap-1.5 px-2.5 py-2 rounded-xl text-xs font-bold transition-all shrink-0 ${
+              activeTab === 'timeline'
                 ? 'bg-[#8F1D2C] text-white shadow-xs'
                 : 'text-[#68736F] hover:bg-slate-50'
             }`}
@@ -169,7 +163,7 @@ export default function DashboardPage() {
           <button
             disabled
             title="AI Assistant coming soon"
-            className="flex-1 min-w-[100px] sm:min-w-[110px] flex items-center justify-center gap-1.5 px-2.5 sm:px-3 py-2 rounded-xl text-xs font-semibold text-slate-400 opacity-60 cursor-not-allowed shrink-0"
+            className="flex-1 min-w-[100px] flex items-center justify-center gap-1.5 px-2.5 py-2 rounded-xl text-xs font-semibold text-slate-400 opacity-60 cursor-not-allowed shrink-0"
           >
             <Bot className="w-3.5 h-3.5 shrink-0" />
             <span>AI Assistant</span>
@@ -183,7 +177,7 @@ export default function DashboardPage() {
               <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
               <input
                 type="text"
-                placeholder="Search doctor, patient, medicine..."
+                placeholder="Search doctor, patient, medicine, specialty..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="w-full min-w-0 pl-9 pr-3 py-2 bg-white border border-slate-200 rounded-xl text-xs text-[#17201D] placeholder:text-slate-400 focus:outline-none focus:border-[#8F1D2C] shadow-xs transition-colors"
@@ -191,9 +185,9 @@ export default function DashboardPage() {
             </div>
 
             <button
-              onClick={() => setShowTimeline(!showTimeline)}
+              onClick={() => setActiveTab(activeTab === 'timeline' ? 'all' : 'timeline')}
               className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-2 rounded-xl border text-xs font-bold transition-all shrink-0 ${
-                showTimeline
+                activeTab === 'timeline'
                   ? 'bg-[#F8E9EC] text-[#8F1D2C] border-[#8F1D2C]/30 shadow-xs'
                   : 'bg-white text-[#68736F] border-slate-200 hover:text-[#17201D] shadow-xs'
               }`}
@@ -245,7 +239,7 @@ export default function DashboardPage() {
         </div>
 
         {/* Medical Timeline View */}
-        {showTimeline && (
+        {activeTab === 'timeline' ? (
           <MedicalTimeline
             records={records}
             onSelectRecord={(rec) => {
@@ -253,10 +247,7 @@ export default function DashboardPage() {
               setIsModalOpen(true)
             }}
           />
-        )}
-
-        {/* Records List / Grid */}
-        {loadingRecords ? (
+        ) : loadingRecords ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full">
             {[1, 2, 3, 4].map((n) => (
               <div
@@ -279,23 +270,29 @@ export default function DashboardPage() {
             ))}
           </div>
         ) : (
-          /* Empty State */
-          <div className="py-10 sm:py-12 text-center bg-white border border-slate-200 rounded-2xl p-4 sm:p-6 space-y-3 shadow-xs w-full">
-            <FileText className="w-8 h-8 text-slate-300 mx-auto" />
-            <h3 className="text-sm font-bold text-[#17201D]">
-              No medical records found
-            </h3>
-            <p className="text-xs text-[#68736F] max-w-xs mx-auto">
-              Click the button below to record your first doctor visit or upload a prescription photo.
-            </p>
+          /* Polished Medical Empty State */
+          <div className="py-12 sm:py-16 text-center bg-white border border-slate-200 rounded-3xl p-6 sm:p-8 space-y-3.5 shadow-xs w-full max-w-md mx-auto">
+            <div className="w-14 h-14 bg-[#F8E9EC] text-[#8F1D2C] rounded-2xl flex items-center justify-center mx-auto">
+              <FolderPlus className="w-7 h-7" />
+            </div>
+
+            <div className="space-y-1">
+              <h3 className="text-base font-extrabold text-[#17201D]">
+                Your medical history starts here
+              </h3>
+              <p className="text-xs text-[#68736F] leading-relaxed max-w-xs mx-auto">
+                Add your first prescription or medical record to keep everything organized for you and your family.
+              </p>
+            </div>
+
             <button
               onClick={() => {
                 setActiveRecord(null)
                 setIsModalOpen(true)
               }}
-              className="inline-flex items-center gap-1.5 px-4 py-2 bg-[#8F1D2C] hover:bg-[#741522] text-white font-bold text-xs rounded-full transition-all shadow-xs"
+              className="inline-flex items-center gap-2 px-5 py-2.5 bg-[#8F1D2C] hover:bg-[#741522] text-white font-bold text-xs rounded-full transition-all shadow-xs hover:scale-105"
             >
-              <Plus className="w-3.5 h-3.5" />
+              <Plus className="w-4 h-4" />
               <span>Add First Record</span>
             </button>
           </div>

@@ -72,7 +72,7 @@ export default function LoginPage() {
     <div className="min-h-screen bg-[#F8F9F7] text-[#17201D] flex flex-col justify-center py-12 px-4 sm:px-6 lg:px-8">
       <div className="sm:mx-auto sm:w-full sm:max-w-md space-y-4">
         {/* Branding Logo */}
-        <div className="w-16 h-16 relative mx-auto rounded-2xl overflow-hidden shadow-xs border border-slate-200 bg-white flex items-center justify-center">
+        <Link href="/" className="inline-block w-16 h-16 relative mx-auto rounded-2xl overflow-hidden shadow-xs border border-slate-200 bg-white flex items-center justify-center">
           <Image
             src="/logo.png"
             alt="MedicoDocs Logo"
@@ -81,14 +81,14 @@ export default function LoginPage() {
             className="object-contain"
             priority
           />
-        </div>
+        </Link>
 
         <div className="text-center">
           <h2 className="text-2xl font-extrabold tracking-tight text-[#17201D]">
-            Sign in to Medico<span className="text-[#8F1D2C]">Docs</span>
+            Welcome Back
           </h2>
           <p className="text-xs font-semibold text-[#68736F] mt-1">
-            Access your secure personal & family medical vault
+            Sign in to access your MedicoDocs medical vault
           </p>
         </div>
       </div>
@@ -101,6 +101,27 @@ export default function LoginPage() {
             </div>
           )}
 
+          {/* Primary Google Sign-In */}
+          <button
+            type="button"
+            onClick={handleGoogleSignIn}
+            disabled={isSubmitting}
+            className="w-full py-3 bg-[#17201D] hover:bg-slate-800 text-white font-bold text-xs rounded-xl shadow-xs transition-all flex items-center justify-center gap-2"
+          >
+            <LogIn className="w-4 h-4 text-[#20A878]" />
+            <span>Continue with Google</span>
+          </button>
+
+          <div className="relative my-4">
+            <div className="absolute inset-0 flex items-center">
+              <div className="w-full border-t border-slate-200" />
+            </div>
+            <div className="relative flex justify-center text-xs">
+              <span className="bg-white px-3 text-[#68736F] font-semibold">OR</span>
+            </div>
+          </div>
+
+          {/* Email / Password Sign In */}
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <label className="block text-xs font-bold text-[#17201D] mb-1">
@@ -144,33 +165,10 @@ export default function LoginPage() {
               {isSubmitting ? (
                 <Loader2 className="w-4 h-4 animate-spin text-white" />
               ) : (
-                <>
-                  <LogIn className="w-4 h-4" />
-                  <span>Sign In</span>
-                </>
+                <span>Sign In with Email</span>
               )}
             </button>
           </form>
-
-          <div className="relative my-4">
-            <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-slate-200" />
-            </div>
-            <div className="relative flex justify-center text-xs">
-              <span className="bg-white px-2 text-[#68736F] font-semibold">Or</span>
-            </div>
-          </div>
-
-          {/* Google Sign-In */}
-          <button
-            type="button"
-            onClick={handleGoogleSignIn}
-            disabled={isSubmitting}
-            className="w-full py-2.5 bg-[#17201D] hover:bg-slate-800 text-white font-bold text-xs rounded-xl shadow-xs transition-all flex items-center justify-center gap-2"
-          >
-            <LogIn className="w-4 h-4 text-[#20A878]" />
-            <span>Continue with Google</span>
-          </button>
 
           <div className="pt-2 text-center text-xs text-[#68736F]">
             Don't have an account?{' '}
