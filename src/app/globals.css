@@ -11,8 +11,8 @@
 }
 
 body {
-  background-color: #020617;
-  color: #f8fafc;
+  background-color: #f8fafc; /* Clean Light slate-50 default */
+  color: #0f172a;            /* Dark slate-900 text default */
   font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
   -webkit-tap-highlight-color: transparent;
 }

@@ -2,7 +2,7 @@
 
 import React, { useState, useMemo } from 'react'
 import { IMedicalRecord } from '@/lib/api'
-import { Calendar, ChevronRight, Stethoscope, User } from 'lucide-react'
+import { Calendar, ChevronRight } from 'lucide-react'
 
 interface MedicalTimelineProps {
   records: IMedicalRecord[]
@@ -63,12 +63,12 @@ export function MedicalTimeline({ records, onSelectRecord }: MedicalTimelineProp
   }, [records, selectedYear])
 
   return (
-    <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 shadow-sm space-y-4">
+    <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-xs space-y-4">
       {/* Timeline Header & Year Selector */}
-      <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+      <div className="flex items-center justify-between border-b border-slate-100 pb-3">
         <div className="flex items-center gap-2">
-          <Calendar className="w-4 h-4 text-teal-400" />
-          <h3 className="font-bold text-xs uppercase tracking-wider text-slate-200">
+          <Calendar className="w-4 h-4 text-teal-600" />
+          <h3 className="font-bold text-xs uppercase tracking-wider text-slate-800">
             Medical History Timeline
           </h3>
         </div>
@@ -81,8 +81,8 @@ export function MedicalTimeline({ records, onSelectRecord }: MedicalTimelineProp
               onClick={() => setSelectedYear(year)}
               className={`px-2.5 py-1 text-xs font-semibold rounded-full border transition-all shrink-0 ${
                 selectedYear === year
-                  ? 'bg-teal-500 text-slate-950 border-teal-400 font-bold shadow-sm'
-                  : 'bg-slate-950 text-slate-400 border-slate-800 hover:text-slate-200'
+                  ? 'bg-teal-600 text-white border-teal-600 font-bold shadow-xs'
+                  : 'bg-slate-50 text-slate-600 border-slate-200 hover:text-slate-900'
               }`}
             >
               {year}
@@ -92,7 +92,7 @@ export function MedicalTimeline({ records, onSelectRecord }: MedicalTimelineProp
       </div>
 
       {/* Visual Timeline Spine */}
-      <div className="relative pl-6 space-y-4 before:absolute before:left-2.5 before:top-2 before:bottom-2 before:w-0.5 before:bg-slate-800">
+      <div className="relative pl-6 space-y-4 before:absolute before:left-2.5 before:top-2 before:bottom-2 before:w-0.5 before:bg-slate-200">
         {MONTH_NAMES.map((monthName, monthIdx) => {
           const monthRecords = monthGroupedRecords[monthIdx] || []
           const hasRecords = monthRecords.length > 0
@@ -103,8 +103,8 @@ export function MedicalTimeline({ records, onSelectRecord }: MedicalTimelineProp
               <div
                 className={`absolute -left-[21px] top-1 w-3 h-3 rounded-full border-2 transition-all ${
                   hasRecords
-                    ? 'bg-teal-400 border-slate-900 ring-4 ring-teal-500/20'
-                    : 'bg-slate-900 border-slate-800'
+                    ? 'bg-teal-500 border-white ring-4 ring-teal-100'
+                    : 'bg-white border-slate-300'
                 }`}
               />
 
@@ -112,7 +112,7 @@ export function MedicalTimeline({ records, onSelectRecord }: MedicalTimelineProp
                 {/* Month Name */}
                 <span
                   className={`text-xs font-bold w-9 pt-0.5 ${
-                    hasRecords ? 'text-teal-300 font-mono' : 'text-slate-600'
+                    hasRecords ? 'text-teal-700 font-mono' : 'text-slate-400'
                   }`}
                 >
                   {monthName}
@@ -126,18 +126,18 @@ export function MedicalTimeline({ records, onSelectRecord }: MedicalTimelineProp
                         <button
                           key={rec._id}
                           onClick={() => onSelectRecord(rec)}
-                          className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-950 hover:bg-slate-800 border border-slate-800 hover:border-teal-500/40 text-xs text-slate-200 transition-all text-left group/btn"
+                          className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-50 hover:bg-teal-50 border border-slate-200 hover:border-teal-300 text-xs text-slate-800 transition-all text-left group/btn"
                         >
-                          <span className="w-1.5 h-1.5 rounded-full bg-teal-400 shrink-0" />
+                          <span className="w-1.5 h-1.5 rounded-full bg-teal-500 shrink-0" />
                           <span className="font-medium truncate max-w-[120px] sm:max-w-[160px]">
                             {rec.patientName} ({rec.doctorName || rec.category})
                           </span>
-                          <ChevronRight className="w-3 h-3 text-slate-600 group-hover/btn:text-teal-400 transition-colors shrink-0" />
+                          <ChevronRight className="w-3 h-3 text-slate-400 group-hover/btn:text-teal-600 transition-colors shrink-0" />
                         </button>
                       ))}
                     </div>
                   ) : (
-                    <div className="h-4 border-b border-dashed border-slate-800/40" />
+                    <div className="h-4 border-b border-dashed border-slate-200/60" />
                   )}
                 </div>
               </div>

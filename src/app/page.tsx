@@ -9,13 +9,9 @@ import { RecordModal } from '@/components/RecordModal'
 import { MedicalTimeline } from '@/components/MedicalTimeline'
 import {
   Search,
-  Filter,
   Plus,
   Calendar,
-  Layers,
-  Sparkles,
   ShieldCheck,
-  Loader2,
   FileText,
   LogIn,
 } from 'lucide-react'
@@ -96,7 +92,7 @@ export default function Home() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 font-sans pb-16">
+    <div className="min-h-screen bg-slate-50 text-slate-900 font-sans pb-16">
       <Navbar
         onOpenCreateModal={() => {
           setActiveRecord(null)
@@ -109,23 +105,23 @@ export default function Home() {
         {!user && !authLoading ? (
           /* Unauthenticated Landing / Sign-In State */
           <div className="py-16 text-center space-y-6 max-w-md mx-auto">
-            <div className="w-16 h-16 bg-slate-900 border border-teal-500/30 rounded-2xl flex items-center justify-center mx-auto shadow-lg shadow-teal-500/5">
-              <ShieldCheck className="w-8 h-8 text-teal-400" />
+            <div className="w-16 h-16 bg-white border border-teal-200 rounded-2xl flex items-center justify-center mx-auto shadow-md shadow-teal-500/5">
+              <ShieldCheck className="w-8 h-8 text-teal-600" />
             </div>
             <div>
-              <h2 className="text-xl font-bold text-white tracking-tight">
+              <h2 className="text-xl font-bold text-slate-900 tracking-tight">
                 Secure Personal Medical Records
               </h2>
-              <p className="text-xs text-slate-400 mt-1 max-w-xs mx-auto">
+              <p className="text-xs text-slate-600 mt-1 max-w-xs mx-auto">
                 Store, search, and visually track medical visits and prescriptions for your entire family.
               </p>
             </div>
 
             <button
               onClick={loginWithGoogle}
-              className="inline-flex items-center gap-2 px-6 py-3 bg-teal-500 hover:bg-teal-400 text-slate-950 font-bold text-sm rounded-full shadow-lg shadow-teal-500/20 transition-all hover:scale-105"
+              className="inline-flex items-center gap-2 px-6 py-3 bg-slate-900 hover:bg-slate-800 text-white font-bold text-sm rounded-full shadow-lg shadow-slate-900/10 transition-all hover:scale-105"
             >
-              <LogIn className="w-4 h-4" />
+              <LogIn className="w-4 h-4 text-teal-400" />
               <span>Sign in with Google</span>
             </button>
           </div>
@@ -142,7 +138,7 @@ export default function Home() {
                     placeholder="Search doctor, patient, medicine, specialty..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    className="w-full pl-9 pr-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:border-teal-500/50 shadow-sm"
+                    className="w-full pl-9 pr-3 py-2 bg-white border border-slate-200 rounded-xl text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-teal-500/80 shadow-xs transition-colors"
                   />
                 </div>
 
@@ -150,8 +146,8 @@ export default function Home() {
                   onClick={() => setShowTimeline(!showTimeline)}
                   className={`flex items-center gap-1.5 px-3 py-2 rounded-xl border text-xs font-semibold transition-all shrink-0 ${
                     showTimeline
-                      ? 'bg-teal-500/10 text-teal-300 border-teal-500/40'
-                      : 'bg-slate-900 text-slate-400 border-slate-800 hover:text-white'
+                      ? 'bg-teal-50 text-teal-700 border-teal-300 shadow-xs'
+                      : 'bg-white text-slate-600 border-slate-200 hover:text-slate-900 shadow-xs'
                   }`}
                 >
                   <Calendar className="w-3.5 h-3.5" />
@@ -161,17 +157,17 @@ export default function Home() {
 
               {/* Family Member Filter Pills */}
               <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5">
-                <span className="text-[11px] font-semibold text-slate-500 shrink-0 pr-1">
+                <span className="text-[11px] font-bold text-slate-400 shrink-0 pr-1">
                   Member:
                 </span>
                 {RELATIONSHIPS.map((rel) => (
                   <button
                     key={rel}
                     onClick={() => setSelectedRelationship(rel)}
-                    className={`px-3 py-1 rounded-full text-xs font-medium transition-all shrink-0 border ${
+                    className={`px-3 py-1 rounded-full text-xs font-semibold transition-all shrink-0 border ${
                       selectedRelationship === rel
-                        ? 'bg-teal-500 text-slate-950 border-teal-400 font-bold shadow-sm'
-                        : 'bg-slate-900 text-slate-400 border-slate-800 hover:text-slate-200'
+                        ? 'bg-teal-600 text-white border-teal-600 shadow-xs font-bold'
+                        : 'bg-white text-slate-600 border-slate-200 hover:text-slate-900'
                     }`}
                   >
                     {rel}
@@ -181,17 +177,17 @@ export default function Home() {
 
               {/* Category Filter Pills */}
               <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5">
-                <span className="text-[11px] font-semibold text-slate-500 shrink-0 pr-1">
+                <span className="text-[11px] font-bold text-slate-400 shrink-0 pr-1">
                   Category:
                 </span>
                 {CATEGORIES.map((cat) => (
                   <button
                     key={cat}
                     onClick={() => setSelectedCategory(cat)}
-                    className={`px-2.5 py-0.5 rounded-md text-[11px] font-medium transition-all shrink-0 border ${
+                    className={`px-2.5 py-0.5 rounded-md text-[11px] font-semibold transition-all shrink-0 border ${
                       selectedCategory === cat
-                        ? 'bg-slate-800 text-teal-300 border-teal-500/40'
-                        : 'bg-slate-950 text-slate-500 border-slate-800/80 hover:text-slate-400'
+                        ? 'bg-slate-200 text-slate-900 border-slate-300 font-bold'
+                        : 'bg-white text-slate-500 border-slate-200 hover:text-slate-800'
                     }`}
                   >
                     {cat}
@@ -217,7 +213,7 @@ export default function Home() {
                 {[1, 2, 3, 4].map((n) => (
                   <div
                     key={n}
-                    className="h-28 bg-slate-900/40 border border-slate-800/60 rounded-xl animate-pulse"
+                    className="h-28 bg-white border border-slate-200 rounded-xl animate-pulse"
                   />
                 ))}
               </div>
@@ -236,9 +232,9 @@ export default function Home() {
               </div>
             ) : (
               /* Empty State */
-              <div className="py-12 text-center bg-slate-900/30 border border-slate-800/60 rounded-2xl p-6 space-y-3">
-                <FileText className="w-8 h-8 text-slate-600 mx-auto" />
-                <h3 className="text-sm font-semibold text-slate-300">
+              <div className="py-12 text-center bg-white border border-slate-200 rounded-2xl p-6 space-y-3 shadow-xs">
+                <FileText className="w-8 h-8 text-slate-300 mx-auto" />
+                <h3 className="text-sm font-bold text-slate-800">
                   No medical records found
                 </h3>
                 <p className="text-xs text-slate-500 max-w-xs mx-auto">
@@ -249,7 +245,7 @@ export default function Home() {
                     setActiveRecord(null)
                     setIsModalOpen(true)
                   }}
-                  className="inline-flex items-center gap-1.5 px-4 py-2 bg-teal-500 hover:bg-teal-400 text-slate-950 font-bold text-xs rounded-full transition-all shadow-sm"
+                  className="inline-flex items-center gap-1.5 px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white font-bold text-xs rounded-full transition-all shadow-xs"
                 >
                   <Plus className="w-3.5 h-3.5" />
                   <span>Add First Record</span>

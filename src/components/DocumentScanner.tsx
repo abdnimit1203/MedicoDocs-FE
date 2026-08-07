@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState, useRef } from 'react'
-import { Camera, Upload, RotateCw, Check, X, Loader2, FileImage } from 'lucide-react'
+import { Camera, Upload, RotateCw, Check, X, Loader2 } from 'lucide-react'
 
 interface DocumentScannerProps {
   initialImage?: {
@@ -50,7 +50,6 @@ export function DocumentScanner({ initialImage, onImageCaptured }: DocumentScann
     const ctx = canvas.getContext('2d')
     if (!ctx) return
 
-    // Max dimensions for medical document preview while keeping high readability
     const MAX_WIDTH = 1200
     const MAX_HEIGHT = 1600
     let width = img.width
@@ -81,7 +80,6 @@ export function DocumentScanner({ initialImage, onImageCaptured }: DocumentScann
 
     const fullQualityUrl = canvas.toDataURL('image/jpeg', 0.85)
 
-    // Generate small thumbnail canvas
     const thumbCanvas = document.createElement('canvas')
     const thumbCtx = thumbCanvas.getContext('2d')
     const THUMB_SIZE = 200
@@ -125,7 +123,7 @@ export function DocumentScanner({ initialImage, onImageCaptured }: DocumentScann
 
   return (
     <div className="space-y-2">
-      <label className="block text-xs font-semibold text-slate-300">
+      <label className="block text-xs font-semibold text-slate-700">
         Prescription / Document Image
       </label>
 
@@ -147,13 +145,13 @@ export function DocumentScanner({ initialImage, onImageCaptured }: DocumentScann
       />
 
       {isProcessing ? (
-        <div className="h-32 rounded-xl border border-dashed border-slate-700 bg-slate-900/50 flex flex-col items-center justify-center gap-2 text-slate-400">
-          <Loader2 className="w-6 h-6 animate-spin text-teal-400" />
-          <span className="text-xs">Processing document image...</span>
+        <div className="h-32 rounded-xl border border-dashed border-slate-300 bg-slate-50 flex flex-col items-center justify-center gap-2 text-slate-500">
+          <Loader2 className="w-6 h-6 animate-spin text-teal-600" />
+          <span className="text-xs font-medium">Processing document image...</span>
         </div>
       ) : imageSrc ? (
-        <div className="relative rounded-xl border border-slate-800 bg-slate-950 p-2 overflow-hidden flex flex-col items-center gap-2">
-          <div className="max-h-48 w-full flex items-center justify-center overflow-hidden rounded-lg bg-slate-900">
+        <div className="relative rounded-xl border border-slate-200 bg-slate-50 p-2 overflow-hidden flex flex-col items-center gap-2">
+          <div className="max-h-48 w-full flex items-center justify-center overflow-hidden rounded-lg bg-slate-100">
             <img
               src={imageSrc}
               alt="Prescription document"
@@ -162,24 +160,24 @@ export function DocumentScanner({ initialImage, onImageCaptured }: DocumentScann
             />
           </div>
 
-          <div className="flex items-center gap-2 w-full justify-between pt-1 border-t border-slate-800/80">
+          <div className="flex items-center gap-2 w-full justify-between pt-1 border-t border-slate-200">
             <button
               type="button"
               onClick={handleRotate}
-              className="flex items-center gap-1 text-[11px] text-slate-300 bg-slate-800 hover:bg-slate-700 px-2.5 py-1 rounded-md transition-colors"
+              className="flex items-center gap-1 text-[11px] text-slate-700 bg-white border border-slate-200 hover:bg-slate-100 px-2.5 py-1 rounded-md transition-colors font-medium shadow-2xs"
             >
-              <RotateCw className="w-3 h-3 text-teal-400" />
+              <RotateCw className="w-3 h-3 text-teal-600" />
               <span>Rotate</span>
             </button>
 
-            <span className="text-[10px] text-teal-400 font-mono flex items-center gap-1">
-              <Check className="w-3 h-3" /> Scanned & Compressed
+            <span className="text-[10px] text-teal-700 font-mono font-semibold flex items-center gap-1">
+              <Check className="w-3 h-3 text-teal-600" /> Scanned & Compressed
             </span>
 
             <button
               type="button"
               onClick={handleRemove}
-              className="flex items-center gap-1 text-[11px] text-rose-400 bg-rose-500/10 hover:bg-rose-500/20 px-2.5 py-1 rounded-md transition-colors"
+              className="flex items-center gap-1 text-[11px] text-rose-600 bg-rose-50 hover:bg-rose-100 px-2.5 py-1 rounded-md transition-colors font-medium"
             >
               <X className="w-3 h-3" />
               <span>Remove</span>
@@ -191,19 +189,19 @@ export function DocumentScanner({ initialImage, onImageCaptured }: DocumentScann
           <button
             type="button"
             onClick={() => cameraInputRef.current?.click()}
-            className="h-20 rounded-xl border border-dashed border-slate-800 hover:border-teal-500/50 bg-slate-900/40 hover:bg-slate-800/60 flex flex-col items-center justify-center gap-1.5 text-slate-300 transition-all group"
+            className="h-20 rounded-xl border border-dashed border-slate-300 hover:border-teal-500 bg-slate-50 hover:bg-teal-50/50 flex flex-col items-center justify-center gap-1.5 text-slate-700 transition-all group"
           >
-            <Camera className="w-5 h-5 text-teal-400 group-hover:scale-110 transition-transform" />
-            <span className="text-xs font-medium">Take Photo</span>
+            <Camera className="w-5 h-5 text-teal-600 group-hover:scale-110 transition-transform" />
+            <span className="text-xs font-semibold">Take Photo</span>
           </button>
 
           <button
             type="button"
             onClick={() => fileInputRef.current?.click()}
-            className="h-20 rounded-xl border border-dashed border-slate-800 hover:border-teal-500/50 bg-slate-900/40 hover:bg-slate-800/60 flex flex-col items-center justify-center gap-1.5 text-slate-300 transition-all group"
+            className="h-20 rounded-xl border border-dashed border-slate-300 hover:border-teal-500 bg-slate-50 hover:bg-teal-50/50 flex flex-col items-center justify-center gap-1.5 text-slate-700 transition-all group"
           >
-            <Upload className="w-5 h-5 text-teal-400 group-hover:scale-110 transition-transform" />
-            <span className="text-xs font-medium">Upload File</span>
+            <Upload className="w-5 h-5 text-teal-600 group-hover:scale-110 transition-transform" />
+            <span className="text-xs font-semibold">Upload File</span>
           </button>
         </div>
       )}
