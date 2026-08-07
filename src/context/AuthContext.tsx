@@ -6,6 +6,8 @@ import {
   signInWithPopup,
   signOut as firebaseSignOut,
   onAuthStateChanged,
+  setPersistence,
+  browserLocalPersistence,
 } from 'firebase/auth'
 import { auth, googleProvider } from '@/lib/firebase'
 
@@ -30,6 +32,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
+    // Ensure auth state persists across browser refreshes
+    setPersistence(auth, browserLocalPersistence).catch((err) => {
+      console.warn('Firebase persistence warning:', err)
+    })
+
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
       setUser(currentUser)
       setLoading(false)
