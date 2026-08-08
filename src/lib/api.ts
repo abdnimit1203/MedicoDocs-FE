@@ -1,8 +1,19 @@
+export type DocumentType = 'visit' | 'prescription' | 'test_report'
+
+export interface ITestResultItem {
+  parameter: string
+  value: string
+  unit?: string
+  referenceRange?: string
+  flag?: 'NORMAL' | 'HIGH' | 'LOW' | 'ABNORMAL' | string
+}
+
 export interface IMedicalRecord {
   _id: string
   userId: string
   patientName: string
   relationship: string
+  documentType?: DocumentType
   doctorName?: string
   doctorSpecialty?: string
   clinicLocation?: string
@@ -15,6 +26,14 @@ export interface IMedicalRecord {
     thumbnail?: string
     dimensions?: { width?: number; height?: number }
   }
+
+  // Extended Medical Visit & Test Report fields
+  testName?: string
+  labName?: string
+  testsOrdered?: string
+  followUpDate?: string
+  testResults?: ITestResultItem[]
+
   createdAt: string
   updatedAt: string
 }

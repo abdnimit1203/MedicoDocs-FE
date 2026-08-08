@@ -1,7 +1,8 @@
 'use client'
 
 import React, { useState, useEffect, useRef } from 'react'
-import { IMedicalRecord } from '@/lib/api'
+import { useAuth } from '@/context/AuthContext'
+import { fetchWithAuth, IMedicalRecord, DocumentType, ITestResultItem } from '@/lib/api'
 import { DocumentScanner } from './DocumentScanner'
 import { LightboxViewer } from './LightboxViewer'
 import {
@@ -20,10 +21,17 @@ import {
   ArrowLeft,
   Check,
   Plus,
+  Sparkles,
+  Loader2,
+  AlertCircle,
+  CheckCircle2,
+  Activity,
+  FlaskConical,
 } from 'lucide-react'
 
 interface RecordModalProps {
   isOpen: boolean
+  initialDocumentType?: DocumentType
   record?: IMedicalRecord | null
   existingRecords?: IMedicalRecord[]
   onClose: () => void
@@ -62,15 +70,18 @@ const DEFAULT_CLINICS = [
 
 export function RecordModal({
   isOpen,
+  initialDocumentType = 'visit',
   record,
   existingRecords = [],
   onClose,
   onSave,
   onDelete,
 }: RecordModalProps) {
+  const { getToken } = useAuth()
   const [mode, setMode] = useState<ModalMode>('CREATE')
 
-  // Form State
+  // Core Document Fields
+  const [documentType, setDocumentType] = useState<DocumentType>(initialDocumentType)
   const [patientName, setPatientName] = useState('')
   const [relationship, setRelationship] = useState('Self')
   const [doctorName, setDoctorName] = useState('')
@@ -85,11 +96,31 @@ export function RecordModal({
     dimensions?: { width?: number; height?: number }
   }>({})
 
-  // Structured Medicines & Clinical Notes (Phase 4)
+  // Medical Visit Specific Fields
+  const [testsOrdered, setTestsOrdered] = useState('')
+  const [followUpDate, setFollowUpDate] = useState('')
+
+  // Test Report Specific Fields
+  const [testName, setTestName] = useState('')
+  const [labName, setLabName] = useState('')
+  const [testResults, setTestResults] = useState<ITestResultItem[]>([])
+  const [paramInput, setParamInput] = useState('')
+  const [valInput, setValInput] = useState('')
+  const [unitInput, setUnitInput] = useState('')
+  const [refInput, setRefInput] = useState('')
+  const [flagInput, setFlagInput] = useState('NORMAL')
+
+  // Medicines & Clinical Notes
   const [medicineInput, setMedicineInput] = useState('')
   const [dosageInput, setDosageInput] = useState('')
   const [medicinesList, setMedicinesList] = useState<{ name: string; dosage: string }[]>([])
   const [clinicalNotes, setClinicalNotes] = useState('')
+
+  // Gemini AI Analysis State
+  const [isAnalyzing, setIsAnalyzing] = useState(false)
+  const [aiSuccessMessage, setAiSuccessMessage] = useState<string | null>(null)
+  const [aiErrorMessage, setAiErrorMessage] = useState<string | null>(null)
+  const [uncertainFields, setUncertainFields] = useState<string[]>([])
 
   // Autocomplete Suggestions State
   const [showSpecialtySuggestions, setShowSpecialtySuggestions] = useState(false)
@@ -121,7 +152,7 @@ export function RecordModal({
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
 
-  // User-specific suggestions from user's own existing records
+  // User-specific suggestions
   const userSpecialties = Array.from(
     new Set(
       [...DEFAULT_SPECIALTIES, ...existingRecords.map((r) => r.doctorSpecialty).filter(Boolean)] as string[]
@@ -153,8 +184,13 @@ export function RecordModal({
   )
 
   useEffect(() => {
+    setAiSuccessMessage(null)
+    setAiErrorMessage(null)
+    setUncertainFields([])
+
     if (record) {
       setMode('VIEW')
+      setDocumentType(record.documentType || 'visit')
       setPatientName(record.patientName || '')
       setRelationship(record.relationship || 'Self')
       setDoctorName(record.doctorName || '')
@@ -166,13 +202,16 @@ export function RecordModal({
       )
       setCategory(record.category || 'General')
       setImageRef(record.imageRef || {})
-
-      // Parse medicinesOrNotes if structured or plain string
-      const notesRaw = record.medicinesOrNotes || ''
-      setClinicalNotes(notesRaw)
+      setTestsOrdered(record.testsOrdered || '')
+      setFollowUpDate(record.followUpDate ? record.followUpDate.substring(0, 10) : '')
+      setTestName(record.testName || '')
+      setLabName(record.labName || '')
+      setTestResults(record.testResults || [])
+      setClinicalNotes(record.medicinesOrNotes || '')
       setMedicinesList([])
     } else {
       setMode('CREATE')
+      setDocumentType(initialDocumentType)
       setPatientName('')
       setRelationship('Self')
       setDoctorName('')
@@ -182,13 +221,110 @@ export function RecordModal({
       setPrescriptionDate('')
       setCategory('General')
       setClinicalNotes('')
+      setTestsOrdered('')
+      setFollowUpDate('')
+      setTestName('')
+      setLabName('')
+      setTestResults([])
       setMedicinesList([])
       setImageRef({})
     }
     setIsLightboxOpen(false)
-  }, [record, isOpen])
+  }, [record, isOpen, initialDocumentType])
 
   if (!isOpen) return null
+
+  // Gemini AI Prescription or Test Report Analysis
+  const handleAnalyzeWithGemini = async () => {
+    if (!imageRef?.url && !imageRef?.thumbnail) {
+      setAiErrorMessage('Please upload a document image first before running AI analysis.')
+      return
+    }
+
+    setIsAnalyzing(true)
+    setAiSuccessMessage(null)
+    setAiErrorMessage(null)
+    setUncertainFields([])
+
+    try {
+      const token = await getToken()
+      const targetImage = imageRef.url || imageRef.thumbnail || ''
+
+      const endpoint =
+        documentType === 'test_report'
+          ? '/records/analyze-test-report'
+          : '/records/analyze-prescription'
+
+      const response = await fetchWithAuth(endpoint, token, {
+        method: 'POST',
+        body: JSON.stringify({ imageUrl: targetImage }),
+      })
+
+      if (response.success && response.data) {
+        const aiData = response.data
+
+        if (documentType === 'test_report') {
+          if (aiData.testName) setTestName(aiData.testName)
+          if (aiData.labName) setLabName(aiData.labName)
+          if (aiData.patientName && !patientName.trim()) setPatientName(aiData.patientName)
+          if (aiData.reportDate) setVisitDate(aiData.reportDate.substring(0, 10))
+          if (aiData.summaryResult) setClinicalNotes(aiData.summaryResult)
+          if (Array.isArray(aiData.testResults)) setTestResults(aiData.testResults)
+
+          setAiSuccessMessage(
+            `✨ Gemini AI Analysis Complete: Extracted test report details and ${
+              aiData.testResults?.length || 0
+            } parameter measurement(s). Please review and edit before saving.`
+          )
+        } else {
+          // Prescription Analysis
+          if (aiData.doctorName) setDoctorName(aiData.doctorName)
+          if (aiData.doctorSpecialty) setDoctorSpecialty(aiData.doctorSpecialty)
+          if (aiData.clinicLocation) setClinicLocation(aiData.clinicLocation)
+          if (aiData.patientName && !patientName.trim()) setPatientName(aiData.patientName)
+          if (aiData.visitDate) setVisitDate(aiData.visitDate.substring(0, 10))
+          if (aiData.prescriptionDate) setPrescriptionDate(aiData.prescriptionDate.substring(0, 10))
+          if (aiData.category) setCategory(aiData.category)
+          if (aiData.clinicalNotes) setClinicalNotes(aiData.clinicalNotes)
+
+          if (Array.isArray(aiData.medicines) && aiData.medicines.length > 0) {
+            const formattedMeds = aiData.medicines.map((m: any) => {
+              const dosageParts = [
+                m.strength,
+                m.frequency,
+                m.duration,
+                m.instructions,
+              ].filter(Boolean)
+              return {
+                name: m.name || 'Prescription Item',
+                dosage: dosageParts.join(' | '),
+              }
+            })
+            setMedicinesList(formattedMeds)
+          }
+
+          setAiSuccessMessage(
+            `✨ Gemini AI Analysis Complete: Extracted prescription details and ${
+              aiData.medicines?.length || 0
+            } medicine(s). Please review and edit before saving.`
+          )
+        }
+
+        if (Array.isArray(aiData.uncertainFields)) {
+          setUncertainFields(aiData.uncertainFields)
+        }
+      } else {
+        throw new Error(response.error?.message || 'AI analysis did not return valid data.')
+      }
+    } catch (err: any) {
+      console.error('Gemini AI Error:', err)
+      setAiErrorMessage(
+        err.message || 'Failed to analyze image with Gemini AI.'
+      )
+    } finally {
+      setIsAnalyzing(false)
+    }
+  }
 
   const handleAddMedicine = () => {
     if (!medicineInput.trim()) return
@@ -204,10 +340,33 @@ export function RecordModal({
     setMedicinesList(medicinesList.filter((_, i) => i !== index))
   }
 
+  const handleAddTestResult = () => {
+    if (!paramInput.trim() || !valInput.trim()) return
+    setTestResults([
+      ...testResults,
+      {
+        parameter: paramInput.trim(),
+        value: valInput.trim(),
+        unit: unitInput.trim() || undefined,
+        referenceRange: refInput.trim() || undefined,
+        flag: flagInput,
+      },
+    ])
+    setParamInput('')
+    setValInput('')
+    setUnitInput('')
+    setRefInput('')
+    setFlagInput('NORMAL')
+  }
+
+  const handleRemoveTestResult = (index: number) => {
+    setTestResults(testResults.filter((_, i) => i !== index))
+  }
+
   const serializeMedicinesAndNotes = (): string => {
     const medText = medicinesList.map((m) => `• ${m.name}${m.dosage ? ` (${m.dosage})` : ''}`).join('\n')
     if (medText && clinicalNotes.trim()) {
-      return `Prescribed Medicines:\n${medText}\n\nClinical Notes & Diagnosis:\n${clinicalNotes.trim()}`
+      return `Prescribed Medicines:\n${medText}\n\nClinical Notes:\n${clinicalNotes.trim()}`
     } else if (medText) {
       return `Prescribed Medicines:\n${medText}`
     } else {
@@ -226,6 +385,7 @@ export function RecordModal({
         _id: record?._id,
         patientName: patientName.trim(),
         relationship,
+        documentType,
         doctorName: doctorName.trim(),
         doctorSpecialty: doctorSpecialty.trim(),
         clinicLocation: clinicLocation.trim(),
@@ -234,6 +394,11 @@ export function RecordModal({
         category,
         medicinesOrNotes: combinedNotes,
         imageRef,
+        testName: testName.trim(),
+        labName: labName.trim(),
+        testsOrdered: testsOrdered.trim(),
+        followUpDate: followUpDate || undefined,
+        testResults,
       })
       onClose()
     } catch (err) {
@@ -245,7 +410,7 @@ export function RecordModal({
 
   const handleDelete = async () => {
     if (!record?._id || !onDelete) return
-    if (!confirm('Are you sure you want to delete this medical record?')) return
+    if (!confirm('Are you sure you want to delete this record?')) return
 
     setIsDeleting(true)
     try {
@@ -278,13 +443,19 @@ export function RecordModal({
                 </button>
               )}
               <h2 className="font-bold text-sm text-[#17201D] flex items-center gap-2">
-                <FileText className="w-4 h-4 text-[#8F1D2C]" />
+                {documentType === 'prescription' ? (
+                  <Pill className="w-4 h-4 text-[#3B988E]" />
+                ) : documentType === 'test_report' ? (
+                  <Activity className="w-4 h-4 text-purple-600" />
+                ) : (
+                  <Stethoscope className="w-4 h-4 text-[#8F1D2C]" />
+                )}
                 <span>
                   {mode === 'VIEW'
-                    ? 'Medical Record Details'
+                    ? `${documentType === 'prescription' ? 'Prescription' : documentType === 'test_report' ? 'Test Report' : 'Medical Visit'} Details`
                     : mode === 'EDIT'
-                    ? 'Edit Medical Record'
-                    : 'New Medical Record'}
+                    ? `Edit ${documentType === 'prescription' ? 'Prescription' : documentType === 'test_report' ? 'Test Report' : 'Medical Visit'}`
+                    : `New ${documentType === 'prescription' ? 'Prescription' : documentType === 'test_report' ? 'Test Report' : 'Medical Visit'}`}
                 </span>
               </h2>
             </div>
@@ -318,11 +489,29 @@ export function RecordModal({
                   <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-[#F8E9EC] text-[#8F1D2C] border border-[#8F1D2C]/30">
                     {relationship}
                   </span>
-                  <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-slate-100 text-[#17201D]">
-                    {category}
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-slate-100 text-[#17201D] capitalize">
+                    {documentType.replace('_', ' ')}
                   </span>
                 </div>
               </div>
+
+              {/* Test Report Header if test_report */}
+              {documentType === 'test_report' && (testName || labName) && (
+                <div className="bg-purple-50 p-3 rounded-xl border border-purple-200 space-y-1 text-xs">
+                  {testName && (
+                    <div className="flex items-center gap-2 text-purple-900 font-bold">
+                      <Activity className="w-4 h-4 text-purple-700 shrink-0" />
+                      <span>{testName}</span>
+                    </div>
+                  )}
+                  {labName && (
+                    <div className="flex items-center gap-2 text-purple-700">
+                      <FlaskConical className="w-4 h-4 text-purple-500 shrink-0" />
+                      <span>{labName}</span>
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* Doctor & Clinic Info */}
               {(doctorName || doctorSpecialty || clinicLocation) && (
@@ -346,12 +535,12 @@ export function RecordModal({
               )}
 
               {/* Dates */}
-              {(visitDate || prescriptionDate) && (
+              {(visitDate || prescriptionDate || followUpDate) && (
                 <div className="grid grid-cols-2 gap-2 text-xs">
                   {visitDate && (
                     <div className="bg-white p-2.5 rounded-xl border border-slate-200 space-y-0.5">
                       <span className="text-[10px] font-bold text-[#68736F] uppercase tracking-wider block">
-                        Visit Date
+                        {documentType === 'prescription' ? 'Rx Date' : documentType === 'test_report' ? 'Report Date' : 'Visit Date'}
                       </span>
                       <div className="flex items-center gap-1.5 font-bold text-[#17201D]">
                         <Calendar className="w-3.5 h-3.5 text-[#3B988E]" />
@@ -360,17 +549,53 @@ export function RecordModal({
                     </div>
                   )}
 
-                  {prescriptionDate && (
+                  {followUpDate && (
                     <div className="bg-white p-2.5 rounded-xl border border-slate-200 space-y-0.5">
                       <span className="text-[10px] font-bold text-[#68736F] uppercase tracking-wider block">
-                        Rx Date
+                        Follow-up Date
                       </span>
-                      <div className="flex items-center gap-1.5 font-bold text-[#17201D]">
-                        <Pill className="w-3.5 h-3.5 text-[#8F1D2C]" />
-                        <span>{prescriptionDate}</span>
+                      <div className="flex items-center gap-1.5 font-bold text-[#8F1D2C]">
+                        <Calendar className="w-3.5 h-3.5 text-[#8F1D2C]" />
+                        <span>{followUpDate}</span>
                       </div>
                     </div>
                   )}
+                </div>
+              )}
+
+              {/* Test Results Table if present */}
+              {testResults.length > 0 && (
+                <div className="space-y-1.5">
+                  <span className="text-[11px] font-bold text-[#17201D] block">
+                    Test Parameter Measurements
+                  </span>
+                  <div className="border border-slate-200 rounded-xl overflow-hidden text-xs">
+                    <table className="w-full text-left">
+                      <thead className="bg-[#F8F9F7] border-b border-slate-200 text-[#68736F] font-semibold text-[11px]">
+                        <tr>
+                          <th className="p-2">Parameter</th>
+                          <th className="p-2">Result</th>
+                          <th className="p-2">Ref Range</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {testResults.map((tr, idx) => (
+                          <tr key={idx}>
+                            <td className="p-2 font-semibold text-[#17201D]">{tr.parameter}</td>
+                            <td className="p-2">
+                              <span className="font-bold">{tr.value}</span> {tr.unit || ''}
+                              {tr.flag && tr.flag !== 'NORMAL' && (
+                                <span className="ml-1 px-1.5 py-0.5 text-[9px] font-bold rounded bg-rose-100 text-rose-700">
+                                  {tr.flag}
+                                </span>
+                              )}
+                            </td>
+                            <td className="p-2 text-[#68736F] text-[11px]">{tr.referenceRange || '-'}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
               )}
 
@@ -378,7 +603,7 @@ export function RecordModal({
               {clinicalNotes && (
                 <div className="space-y-1">
                   <span className="text-[11px] font-bold text-[#17201D] block">
-                    Medicines & Clinical Notes
+                    Notes & Clinical Details
                   </span>
                   <div className="p-3 bg-white border border-slate-200 rounded-xl text-xs text-[#17201D] leading-relaxed whitespace-pre-line">
                     {clinicalNotes}
@@ -386,37 +611,57 @@ export function RecordModal({
                 </div>
               )}
 
-              {/* Prescription Document Display */}
+              {/* Prescription / Test Document Display */}
               <div className="space-y-1.5 pt-1">
                 <span className="text-[11px] font-bold text-[#17201D] block">
-                  Prescription Document
+                  Attached Document / Image
                 </span>
 
                 {hasImage ? (
-                  <div
-                    onClick={() => setIsLightboxOpen(true)}
-                    className="group relative rounded-xl border border-slate-200 bg-slate-900 overflow-hidden cursor-pointer shadow-xs hover:border-[#8F1D2C] transition-all max-h-56 flex items-center justify-center"
-                  >
-                    <img
-                      src={displayImageUrl}
-                      alt="Prescription Document"
-                      className="max-h-56 w-full object-contain group-hover:scale-102 transition-transform duration-200"
-                    />
+                  <div className="space-y-2">
+                    <div
+                      onClick={() => setIsLightboxOpen(true)}
+                      className="group relative rounded-xl border border-slate-200 bg-slate-900 overflow-hidden cursor-pointer shadow-xs hover:border-[#8F1D2C] transition-all max-h-56 flex items-center justify-center"
+                    >
+                      <img
+                        src={displayImageUrl}
+                        alt="Medical Document"
+                        className="max-h-56 w-full object-contain group-hover:scale-102 transition-transform duration-200"
+                      />
 
-                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-1 text-white text-xs font-bold">
-                      <ZoomIn className="w-6 h-6 text-white" />
-                      <span>Tap to view full resolution</span>
+                      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-1 text-white text-xs font-bold">
+                        <ZoomIn className="w-6 h-6 text-white" />
+                        <span>Tap to view full resolution</span>
+                      </div>
                     </div>
 
-                    <div className="absolute bottom-2 right-2 bg-black/70 text-white text-[10px] font-bold px-2 py-0.5 rounded-md flex items-center gap-1 backdrop-blur-xs">
-                      <ZoomIn className="w-3 h-3" />
-                      <span>Inspect Image</span>
-                    </div>
+                    <button
+                      type="button"
+                      onClick={handleAnalyzeWithGemini}
+                      disabled={isAnalyzing}
+                      className="w-full py-2.5 bg-gradient-to-r from-[#8F1D2C] to-[#3B988E] hover:opacity-95 text-white font-bold text-xs rounded-xl shadow-xs transition-all flex items-center justify-center gap-2"
+                    >
+                      {isAnalyzing ? (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin text-white" />
+                          <span>Analyzing document with Gemini AI...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Sparkles className="w-4 h-4 text-amber-300" />
+                          <span>
+                            {documentType === 'test_report'
+                              ? 'Scan Test Report with Gemini AI'
+                              : 'Scan Prescription with Gemini AI'}
+                          </span>
+                        </>
+                      )}
+                    </button>
                   </div>
                 ) : (
                   <div className="py-6 rounded-xl border border-dashed border-slate-200 bg-[#F8F9F7] text-center space-y-1 text-[#68736F]">
                     <ImageOff className="w-6 h-6 text-slate-300 mx-auto" />
-                    <p className="text-xs font-semibold">No prescription image attached</p>
+                    <p className="text-xs font-semibold">No document image attached</p>
                   </div>
                 )}
               </div>
@@ -454,7 +699,65 @@ export function RecordModal({
             /* MODE 2 & 3: FORM INPUT MODE (CREATE or EDIT)           */
             /* ====================================================== */
             <form onSubmit={handleSubmit} className="p-4 space-y-4 overflow-y-auto flex-1 w-full max-w-full">
-              {/* Patient & Relationship */}
+              {/* Gemini AI Status Banners */}
+              {aiSuccessMessage && (
+                <div className="p-3 bg-[#E6F4F2] border border-[#3B988E]/30 rounded-xl text-xs text-[#17201D] space-y-1">
+                  <div className="flex items-start gap-2 font-bold text-[#3B988E]">
+                    <CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5 text-[#20A878]" />
+                    <span>{aiSuccessMessage}</span>
+                  </div>
+                  {uncertainFields.length > 0 && (
+                    <p className="text-[11px] text-amber-700 bg-amber-50 p-1.5 rounded-lg border border-amber-200 mt-1">
+                      ⚠️ Note: Some fields could not be read with 100% confidence ({uncertainFields.join(', ')}). Please verify them.
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {aiErrorMessage && (
+                <div className="p-3 bg-[#F8E9EC] border border-[#8F1D2C]/30 rounded-xl text-xs text-[#8F1D2C] flex items-start gap-2">
+                  <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                  <div>
+                    <span className="font-bold block">Gemini AI Error:</span>
+                    <span>{aiErrorMessage}</span>
+                  </div>
+                </div>
+              )}
+
+              {/* Document Upload & Gemini Scan Button */}
+              <div className="space-y-2">
+                <DocumentScanner
+                  initialImage={imageRef}
+                  onImageCaptured={(scannedImg) => setImageRef(scannedImg)}
+                />
+
+                {hasImage && (
+                  <button
+                    type="button"
+                    onClick={handleAnalyzeWithGemini}
+                    disabled={isAnalyzing}
+                    className="w-full py-2.5 bg-gradient-to-r from-[#8F1D2C] to-[#3B988E] hover:opacity-95 text-white font-bold text-xs rounded-xl shadow-xs transition-all flex items-center justify-center gap-2"
+                  >
+                    {isAnalyzing ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin text-white" />
+                        <span>Analyzing with Gemini AI...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="w-4 h-4 text-amber-300" />
+                        <span>
+                          {documentType === 'test_report'
+                            ? 'Scan Test Report with Gemini AI'
+                            : 'Scan Prescription with Gemini AI'}
+                        </span>
+                      </>
+                    )}
+                  </button>
+                )}
+              </div>
+
+              {/* Patient Name & Relationship */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                 <div className="sm:col-span-2">
                   <label className="block text-xs font-semibold text-[#17201D] mb-1">
@@ -489,239 +792,329 @@ export function RecordModal({
                 </div>
               </div>
 
-              {/* Doctor & Specialty with Autocomplete Suggestions */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                {/* Doctor Name */}
-                <div className="relative" ref={doctorRef}>
-                  <label className="block text-xs font-semibold text-[#17201D] mb-1">
-                    Doctor Name
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="e.g. Dr. Sarah Jenkins"
-                    value={doctorName}
-                    onFocus={() => setShowDoctorSuggestions(true)}
-                    onChange={(e) => {
-                      setDoctorName(e.target.value)
-                      setShowDoctorSuggestions(true)
-                    }}
-                    className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs text-[#17201D] focus:outline-none focus:border-[#8F1D2C]"
-                  />
-                  {showDoctorSuggestions && filteredDoctors.length > 0 && (
-                    <div className="absolute top-full left-0 right-0 z-30 mt-1 bg-white border border-slate-200 rounded-xl shadow-lg max-h-36 overflow-y-auto py-1">
-                      {filteredDoctors.map((doc) => (
-                        <button
-                          type="button"
-                          key={doc}
-                          onClick={() => {
-                            setDoctorName(doc)
-                            setShowDoctorSuggestions(false)
-                          }}
-                          className="w-full px-3 py-1.5 text-left text-xs hover:bg-[#F8E9EC] hover:text-[#8F1D2C] text-[#17201D] font-medium transition-colors flex items-center justify-between"
-                        >
-                          <span>{doc}</span>
-                          <Check className="w-3 h-3 text-[#20A878] opacity-60" />
-                        </button>
-                      ))}
+              {/* FORM TYPE SPECIFIC FIELDS */}
+
+              {/* 1. TEST REPORT SPECIFIC FORM */}
+              {documentType === 'test_report' ? (
+                <div className="space-y-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <div>
+                      <label className="block text-xs font-semibold text-[#17201D] mb-1">
+                        Test / Report Name *
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        placeholder="e.g. Complete Blood Count (CBC)"
+                        value={testName}
+                        onChange={(e) => setTestName(e.target.value)}
+                        className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs text-[#17201D] focus:outline-none focus:border-purple-600"
+                      />
                     </div>
-                  )}
-                </div>
-
-                {/* Doctor Specialty Autocomplete */}
-                <div className="relative" ref={specialtyRef}>
-                  <label className="block text-xs font-semibold text-[#17201D] mb-1">
-                    Specialty
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="e.g. Cardiology"
-                    value={doctorSpecialty}
-                    onFocus={() => setShowSpecialtySuggestions(true)}
-                    onChange={(e) => {
-                      setDoctorSpecialty(e.target.value)
-                      setShowSpecialtySuggestions(true)
-                    }}
-                    className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs text-[#17201D] focus:outline-none focus:border-[#8F1D2C]"
-                  />
-                  {showSpecialtySuggestions && filteredSpecialties.length > 0 && (
-                    <div className="absolute top-full left-0 right-0 z-30 mt-1 bg-white border border-slate-200 rounded-xl shadow-lg max-h-40 overflow-y-auto py-1">
-                      {filteredSpecialties.map((spec) => (
-                        <button
-                          type="button"
-                          key={spec}
-                          onClick={() => {
-                            setDoctorSpecialty(spec)
-                            setShowSpecialtySuggestions(false)
-                          }}
-                          className="w-full px-3 py-1.5 text-left text-xs hover:bg-[#F8E9EC] hover:text-[#8F1D2C] text-[#17201D] font-medium transition-colors flex items-center justify-between"
-                        >
-                          <span>{spec}</span>
-                          <Check className="w-3 h-3 text-[#20A878] opacity-60" />
-                        </button>
-                      ))}
+                    <div>
+                      <label className="block text-xs font-semibold text-[#17201D] mb-1">
+                        Diagnostic Lab / Hospital
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="e.g. Quest Diagnostics"
+                        value={labName}
+                        onChange={(e) => setLabName(e.target.value)}
+                        className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs text-[#17201D] focus:outline-none focus:border-purple-600"
+                      />
                     </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Clinic & Category with Autocomplete */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                <div className="relative" ref={clinicRef}>
-                  <label className="block text-xs font-semibold text-[#17201D] mb-1">
-                    Clinic / Hospital Location
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="e.g. Apollo Hospital"
-                    value={clinicLocation}
-                    onFocus={() => setShowClinicSuggestions(true)}
-                    onChange={(e) => {
-                      setClinicLocation(e.target.value)
-                      setShowClinicSuggestions(true)
-                    }}
-                    className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs text-[#17201D] focus:outline-none focus:border-[#8F1D2C]"
-                  />
-                  {showClinicSuggestions && filteredClinics.length > 0 && (
-                    <div className="absolute top-full left-0 right-0 z-30 mt-1 bg-white border border-slate-200 rounded-xl shadow-lg max-h-40 overflow-y-auto py-1">
-                      {filteredClinics.map((clinic) => (
-                        <button
-                          type="button"
-                          key={clinic}
-                          onClick={() => {
-                            setClinicLocation(clinic)
-                            setShowClinicSuggestions(false)
-                          }}
-                          className="w-full px-3 py-1.5 text-left text-xs hover:bg-[#F8E9EC] hover:text-[#8F1D2C] text-[#17201D] font-medium transition-colors flex items-center justify-between"
-                        >
-                          <span>{clinic}</span>
-                          <Check className="w-3 h-3 text-[#20A878] opacity-60" />
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-[#17201D] mb-1">
-                    Category
-                  </label>
-                  <select
-                    value={category}
-                    onChange={(e) => setCategory(e.target.value)}
-                    className="w-full px-2.5 py-2 bg-white border border-slate-300 rounded-lg text-xs text-[#17201D] focus:outline-none focus:border-[#8F1D2C]"
-                  >
-                    <option value="General">General</option>
-                    <option value="Disease">Disease</option>
-                    <option value="Condition">Condition</option>
-                    <option value="Specialty">Specialty</option>
-                  </select>
-                </div>
-              </div>
-
-              {/* Dates */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                <div>
-                  <label className="block text-xs font-semibold text-[#17201D] mb-1">
-                    Visit Date
-                  </label>
-                  <input
-                    type="date"
-                    value={visitDate}
-                    onChange={(e) => setVisitDate(e.target.value)}
-                    className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs text-[#17201D] focus:outline-none focus:border-[#8F1D2C]"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold text-[#17201D] mb-1">
-                    Prescription Date
-                  </label>
-                  <input
-                    type="date"
-                    value={prescriptionDate}
-                    onChange={(e) => setPrescriptionDate(e.target.value)}
-                    className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs text-[#17201D] focus:outline-none focus:border-[#8F1D2C]"
-                  />
-                </div>
-              </div>
-
-              {/* Phase 4: Prescribed Medicines & Clinical Notes Structure */}
-              <div className="space-y-3 bg-[#F8F9F7] p-3 rounded-xl border border-slate-200">
-                <div className="flex items-center justify-between">
-                  <label className="text-xs font-bold text-[#17201D] flex items-center gap-1.5">
-                    <Pill className="w-3.5 h-3.5 text-[#8F1D2C]" />
-                    <span>Prescribed Medicines</span>
-                  </label>
-                  <span className="text-[10px] text-[#68736F] font-semibold">Structured Entry</span>
-                </div>
-
-                {/* Quick Add Medicine Row */}
-                <div className="flex items-center gap-1.5">
-                  <input
-                    type="text"
-                    placeholder="Medicine (e.g. Amoxicillin)"
-                    value={medicineInput}
-                    onChange={(e) => setMedicineInput(e.target.value)}
-                    className="flex-1 min-w-0 px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg text-xs focus:outline-none focus:border-[#8F1D2C]"
-                  />
-                  <input
-                    type="text"
-                    placeholder="Dosage (500mg 3x/day)"
-                    value={dosageInput}
-                    onChange={(e) => setDosageInput(e.target.value)}
-                    className="w-32 sm:w-36 px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg text-xs focus:outline-none focus:border-[#8F1D2C]"
-                  />
-                  <button
-                    type="button"
-                    onClick={handleAddMedicine}
-                    className="px-2.5 py-1.5 bg-[#8F1D2C] hover:bg-[#741522] text-white rounded-lg text-xs font-bold flex items-center gap-1 shrink-0"
-                  >
-                    <Plus className="w-3.5 h-3.5" />
-                    <span>Add</span>
-                  </button>
-                </div>
-
-                {/* Medicines List Badges */}
-                {medicinesList.length > 0 && (
-                  <div className="flex flex-wrap gap-1.5 pt-1">
-                    {medicinesList.map((m, idx) => (
-                      <span
-                        key={idx}
-                        className="inline-flex items-center gap-1 px-2.5 py-1 bg-white border border-slate-200 rounded-lg text-xs font-medium text-[#17201D]"
-                      >
-                        <span className="font-bold text-[#8F1D2C]">{m.name}</span>
-                        {m.dosage && <span className="text-[#68736F] text-[11px]">({m.dosage})</span>}
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveMedicine(idx)}
-                          className="text-slate-400 hover:text-rose-600 ml-0.5"
-                        >
-                          <X className="w-3 h-3" />
-                        </button>
-                      </span>
-                    ))}
                   </div>
-                )}
 
-                {/* Clinical Notes & Advice Textarea */}
-                <div>
-                  <label className="block text-[11px] font-semibold text-[#68736F] mb-1">
-                    Clinical Notes & Diagnosis / Advice
-                  </label>
-                  <textarea
-                    rows={2}
-                    placeholder="e.g. Diagnosis: Acute Pharyngitis. Advice: Drink warm water, rest for 5 days..."
-                    value={clinicalNotes}
-                    onChange={(e) => setClinicalNotes(e.target.value)}
-                    className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs text-[#17201D] focus:outline-none focus:border-[#8F1D2C] resize-none"
-                  />
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <div>
+                      <label className="block text-xs font-semibold text-[#17201D] mb-1">
+                        Report Date
+                      </label>
+                      <input
+                        type="date"
+                        value={visitDate}
+                        onChange={(e) => setVisitDate(e.target.value)}
+                        className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs text-[#17201D] focus:outline-none focus:border-purple-600"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Extracted Test Parameter Items */}
+                  <div className="space-y-2.5 bg-purple-50/50 p-3 rounded-xl border border-purple-200">
+                    <div className="flex items-center justify-between">
+                      <label className="text-xs font-bold text-purple-900 flex items-center gap-1.5">
+                        <Activity className="w-3.5 h-3.5 text-purple-700" />
+                        <span>Test Parameters & Results</span>
+                      </label>
+                    </div>
+
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
+                      <input
+                        type="text"
+                        placeholder="Parameter (e.g. Hemoglobin)"
+                        value={paramInput}
+                        onChange={(e) => setParamInput(e.target.value)}
+                        className="px-2 py-1.5 bg-white border border-slate-300 rounded-lg text-xs"
+                      />
+                      <input
+                        type="text"
+                        placeholder="Value (e.g. 14.2)"
+                        value={valInput}
+                        onChange={(e) => setValInput(e.target.value)}
+                        className="px-2 py-1.5 bg-white border border-slate-300 rounded-lg text-xs"
+                      />
+                      <input
+                        type="text"
+                        placeholder="Unit (g/dL)"
+                        value={unitInput}
+                        onChange={(e) => setUnitInput(e.target.value)}
+                        className="px-2 py-1.5 bg-white border border-slate-300 rounded-lg text-xs"
+                      />
+                      <button
+                        type="button"
+                        onClick={handleAddTestResult}
+                        className="px-2.5 py-1.5 bg-purple-700 text-white rounded-lg text-xs font-bold flex items-center justify-center gap-1"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                        <span>Add Item</span>
+                      </button>
+                    </div>
+
+                    {testResults.length > 0 && (
+                      <div className="space-y-1 max-h-36 overflow-y-auto">
+                        {testResults.map((tr, idx) => (
+                          <div
+                            key={idx}
+                            className="flex items-center justify-between p-2 bg-white rounded-lg border border-purple-100 text-xs"
+                          >
+                            <div>
+                              <span className="font-bold text-[#17201D]">{tr.parameter}: </span>
+                              <span className="font-extrabold text-purple-900">{tr.value}</span>{' '}
+                              <span className="text-[#68736F] text-[11px]">{tr.unit || ''}</span>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveTestResult(idx)}
+                              className="text-slate-400 hover:text-rose-600"
+                            >
+                              <X className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 </div>
-              </div>
+              ) : (
+                /* 2. MEDICAL VISIT / PRESCRIPTION COMMON FORM */
+                <div className="space-y-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {/* Doctor Name */}
+                    <div className="relative" ref={doctorRef}>
+                      <label className="block text-xs font-semibold text-[#17201D] mb-1">
+                        Doctor Name
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="e.g. Dr. Sarah Jenkins"
+                        value={doctorName}
+                        onFocus={() => setShowDoctorSuggestions(true)}
+                        onChange={(e) => {
+                          setDoctorName(e.target.value)
+                          setShowDoctorSuggestions(true)
+                        }}
+                        className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs text-[#17201D] focus:outline-none focus:border-[#8F1D2C]"
+                      />
+                      {showDoctorSuggestions && filteredDoctors.length > 0 && (
+                        <div className="absolute top-full left-0 right-0 z-30 mt-1 bg-white border border-slate-200 rounded-xl shadow-lg max-h-36 overflow-y-auto py-1">
+                          {filteredDoctors.map((doc) => (
+                            <button
+                              type="button"
+                              key={doc}
+                              onClick={() => {
+                                setDoctorName(doc)
+                                setShowDoctorSuggestions(false)
+                              }}
+                              className="w-full px-3 py-1.5 text-left text-xs hover:bg-[#F8E9EC] hover:text-[#8F1D2C] text-[#17201D] font-medium transition-colors flex items-center justify-between"
+                            >
+                              <span>{doc}</span>
+                              <Check className="w-3 h-3 text-[#20A878] opacity-60" />
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
 
-              {/* Document Scanner Component (Preserving ImageKit Upload) */}
-              <DocumentScanner
-                initialImage={imageRef}
-                onImageCaptured={(scannedImg) => setImageRef(scannedImg)}
-              />
+                    {/* Specialty Autocomplete */}
+                    <div className="relative" ref={specialtyRef}>
+                      <label className="block text-xs font-semibold text-[#17201D] mb-1">
+                        Specialty
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="e.g. Cardiology"
+                        value={doctorSpecialty}
+                        onFocus={() => setShowSpecialtySuggestions(true)}
+                        onChange={(e) => {
+                          setDoctorSpecialty(e.target.value)
+                          setShowSpecialtySuggestions(true)
+                        }}
+                        className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs text-[#17201D] focus:outline-none focus:border-[#8F1D2C]"
+                      />
+                      {showSpecialtySuggestions && filteredSpecialties.length > 0 && (
+                        <div className="absolute top-full left-0 right-0 z-30 mt-1 bg-white border border-slate-200 rounded-xl shadow-lg max-h-40 overflow-y-auto py-1">
+                          {filteredSpecialties.map((spec) => (
+                            <button
+                              type="button"
+                              key={spec}
+                              onClick={() => {
+                                setDoctorSpecialty(spec)
+                                setShowSpecialtySuggestions(false)
+                              }}
+                              className="w-full px-3 py-1.5 text-left text-xs hover:bg-[#F8E9EC] hover:text-[#8F1D2C] text-[#17201D] font-medium transition-colors flex items-center justify-between"
+                            >
+                              <span>{spec}</span>
+                              <Check className="w-3 h-3 text-[#20A878] opacity-60" />
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Clinic & Date */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <div className="relative" ref={clinicRef}>
+                      <label className="block text-xs font-semibold text-[#17201D] mb-1">
+                        Hospital / Clinic
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="e.g. Apollo Hospital"
+                        value={clinicLocation}
+                        onFocus={() => setShowClinicSuggestions(true)}
+                        onChange={(e) => {
+                          setClinicLocation(e.target.value)
+                          setShowClinicSuggestions(true)
+                        }}
+                        className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs text-[#17201D] focus:outline-none focus:border-[#8F1D2C]"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-semibold text-[#17201D] mb-1">
+                        {documentType === 'prescription' ? 'Prescription Date' : 'Visit Date'}
+                      </label>
+                      <input
+                        type="date"
+                        value={visitDate}
+                        onChange={(e) => setVisitDate(e.target.value)}
+                        className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs text-[#17201D] focus:outline-none focus:border-[#8F1D2C]"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Additional Medical Visit Fields */}
+                  {documentType === 'visit' && (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      <div>
+                        <label className="block text-xs font-semibold text-[#17201D] mb-1">
+                          Tests Ordered
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="e.g. Blood Test, X-Ray"
+                          value={testsOrdered}
+                          onChange={(e) => setTestsOrdered(e.target.value)}
+                          className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs text-[#17201D]"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-semibold text-[#17201D] mb-1">
+                          Follow-up Date
+                        </label>
+                        <input
+                          type="date"
+                          value={followUpDate}
+                          onChange={(e) => setFollowUpDate(e.target.value)}
+                          className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs text-[#17201D]"
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Prescribed Medicines Entry */}
+                  <div className="space-y-3 bg-[#F8F9F7] p-3 rounded-xl border border-slate-200">
+                    <div className="flex items-center justify-between">
+                      <label className="text-xs font-bold text-[#17201D] flex items-center gap-1.5">
+                        <Pill className="w-3.5 h-3.5 text-[#8F1D2C]" />
+                        <span>Prescribed Medicines</span>
+                      </label>
+                    </div>
+
+                    <div className="flex items-center gap-1.5">
+                      <input
+                        type="text"
+                        placeholder="Medicine name"
+                        value={medicineInput}
+                        onChange={(e) => setMedicineInput(e.target.value)}
+                        className="flex-1 min-w-0 px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg text-xs"
+                      />
+                      <input
+                        type="text"
+                        placeholder="Dosage (500mg 3x/day)"
+                        value={dosageInput}
+                        onChange={(e) => setDosageInput(e.target.value)}
+                        className="w-32 sm:w-36 px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg text-xs"
+                      />
+                      <button
+                        type="button"
+                        onClick={handleAddMedicine}
+                        className="px-2.5 py-1.5 bg-[#8F1D2C] hover:bg-[#741522] text-white rounded-lg text-xs font-bold flex items-center gap-1 shrink-0"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                        <span>Add</span>
+                      </button>
+                    </div>
+
+                    {medicinesList.length > 0 && (
+                      <div className="flex flex-wrap gap-1.5 pt-1">
+                        {medicinesList.map((m, idx) => (
+                          <span
+                            key={idx}
+                            className="inline-flex items-center gap-1 px-2.5 py-1 bg-white border border-slate-200 rounded-lg text-xs font-medium text-[#17201D]"
+                          >
+                            <span className="font-bold text-[#8F1D2C]">{m.name}</span>
+                            {m.dosage && <span className="text-[#68736F] text-[11px]">({m.dosage})</span>}
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveMedicine(idx)}
+                              className="text-slate-400 hover:text-rose-600 ml-0.5"
+                            >
+                              <X className="w-3 h-3" />
+                            </button>
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Diagnosis / Clinical Notes Textarea */}
+              <div>
+                <label className="block text-[11px] font-semibold text-[#68736F] mb-1">
+                  Diagnosis / Clinical Notes & Advice
+                </label>
+                <textarea
+                  rows={2}
+                  placeholder="e.g. Diagnosis, doctor instructions, or report summary..."
+                  value={clinicalNotes}
+                  onChange={(e) => setClinicalNotes(e.target.value)}
+                  className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs text-[#17201D] focus:outline-none focus:border-[#8F1D2C] resize-none"
+                />
+              </div>
 
               {/* Form Footer Actions */}
               <div className="pt-3 border-t border-slate-200 flex items-center justify-between gap-2">
@@ -756,8 +1149,8 @@ export function RecordModal({
       <LightboxViewer
         isOpen={isLightboxOpen}
         imageUrl={displayImageUrl}
-        title={`${patientName}'s Prescription`}
-        subtitle={doctorName ? `Doctor: ${doctorName}` : undefined}
+        title={`${patientName}'s Medical Record`}
+        subtitle={doctorName ? `Doctor: ${doctorName}` : testName ? `Test: ${testName}` : undefined}
         onClose={() => setIsLightboxOpen(false)}
       />
     </>
