@@ -7,6 +7,14 @@ export const metadata: Metadata = {
   title: 'MedicoDocs by AB',
   description: 'Lightweight mobile-first personal & family medical document manager',
   manifest: '/manifest.json',
+  icons: {
+    icon: [
+      { url: '/logo.png', type: 'image/png' },
+      { url: '/favicon.ico', type: 'image/x-icon' },
+    ],
+    shortcut: '/logo.png',
+    apple: '/icon-192.png',
+  },
 };
 
 export const viewport: Viewport = {
