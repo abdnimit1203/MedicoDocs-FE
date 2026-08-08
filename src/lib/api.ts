@@ -8,6 +8,14 @@ export interface ITestResultItem {
   flag?: 'NORMAL' | 'HIGH' | 'LOW' | 'ABNORMAL' | string
 }
 
+export interface IMedicineItem {
+  name: string
+  strength?: string
+  frequency?: string
+  duration?: string
+  instructions?: string
+}
+
 export interface IMedicalRecord {
   _id: string
   userId: string
@@ -19,15 +27,18 @@ export interface IMedicalRecord {
   clinicLocation?: string
   visitDate?: string
   prescriptionDate?: string
+  effectiveDate?: string
   category?: string
+  // Clinical diagnosis/notes/advice text only. Structured medicines live in `medicines` below.
   medicinesOrNotes?: string
   imageRef?: {
     url?: string
     thumbnail?: string
     dimensions?: { width?: number; height?: number }
   }
+  medicines?: IMedicineItem[]
 
-  // Extended Medical Visit & Test Report fields
+  // Extended Test Report fields (testsOrdered/followUpDate are legacy, pre-'visit'-retirement only)
   testName?: string
   labName?: string
   testsOrdered?: string

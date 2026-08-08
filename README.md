@@ -15,9 +15,11 @@
 
 ## 🌟 Key Features
 
-* 📱 **Mobile-First UX:** Sleek, responsive layout with a fixed bottom navigation bar and bottom-right Floating Action Button (FAB).
-* 🤖 **Gemini AI Prescription Intelligence:** Automatically extracts doctor details, specialties, clinic locations, prescribed medicines, dosages, frequencies, and clinical notes from uploaded document images.
+* 📱 **Mobile-First, Prescription-First UX:** Simplified nav (Overview / Prescriptions / Test Reports / AI Assistant / Profile) with a fixed bottom navigation bar and a bottom-right Floating Action Button (FAB) that asks just one question: Prescription or Test Report.
+* 🤖 **Gemini AI Prescription Intelligence:** Automatically extracts doctor details, specialties, clinic locations, a fully-editable structured `medicines[]` list (name, strength, frequency, duration, instructions), and clinical notes from uploaded document images.
 * 🧪 **Diagnostic Test Report Intelligence:** Specialized Gemini AI extraction for lab test parameters, measured values, reference ranges, and abnormal flags.
+* 💊 **Inline Medicine Editing + Search:** Every medicine row — AI-extracted or manually added — is editable in place. Each includes a "Search medicine" link that opens a Google search restricted to `medex.com.bd` in a new tab (name + strength when known); nothing is scraped or stored.
+* 💬 **AI Medical Assistant:** A chat tab that answers questions about your own stored prescriptions and test reports (English/Bangla/mixed) — grounded strictly in your MedicoDocs data, never invents facts, and clearly flags anything unclear or unavailable.
 * 🛡️ **Review-Before-Save Safety Guarantee:** AI predictions populate local form fields for user review before explicitly saving to MongoDB. No silent autosaving.
 * 🔒 **Firebase Authentication:** User-isolated data vault with Google One-Tap Sign-In and Email/Password security.
 * ⚡ **ImageKit Cloud CDN:** Optimized cloud image uploads with Base64 fallback handling.

@@ -14,6 +14,7 @@ const relationshipColors: Record<string, string> = {
   Father: 'bg-blue-50 text-blue-800 border-blue-200',
   Mother: 'bg-purple-50 text-purple-800 border-purple-200',
   Wife: 'bg-rose-50 text-rose-800 border-rose-200',
+  Husband: 'bg-green-50 text-green-800 border-green-200',
   Child: 'bg-amber-50 text-amber-800 border-amber-200',
   Sibling: 'bg-[#E8F7F0] text-[#20A878] border-[#20A878]/30',
   Other: 'bg-slate-100 text-[#68736F] border-slate-200',
@@ -22,17 +23,17 @@ const relationshipColors: Record<string, string> = {
 export function RecordCard({ record, onClick }: RecordCardProps) {
   const formattedDate = record.visitDate
     ? new Date(record.visitDate).toLocaleDateString('en-US', {
-        month: 'short',
-        day: 'numeric',
-        year: 'numeric',
-      })
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+    })
     : record.prescriptionDate
-    ? new Date(record.prescriptionDate).toLocaleDateString('en-US', {
+      ? new Date(record.prescriptionDate).toLocaleDateString('en-US', {
         month: 'short',
         day: 'numeric',
         year: 'numeric',
       })
-    : new Date(record.createdAt).toLocaleDateString('en-US', {
+      : new Date(record.createdAt).toLocaleDateString('en-US', {
         month: 'short',
         day: 'numeric',
         year: 'numeric',
@@ -82,14 +83,23 @@ export function RecordCard({ record, onClick }: RecordCardProps) {
         )}
 
         {/* Medicines / Notes Preview */}
-        {record.medicinesOrNotes && (
+        {record.medicines && record.medicines.length > 0 ? (
+          <div className="flex items-start gap-1.5 bg-[#F8E9EC]/50 border border-[#8F1D2C]/15 rounded-lg p-2 mb-2 min-w-0">
+            <Pill className="w-3.5 h-3.5 text-[#8F1D2C] shrink-0 mt-0.5" />
+            <p className="text-[11px] text-[#17201D] font-medium min-w-0 leading-tight truncate">
+              {record.medicines[0].name}
+              {record.medicines[0].strength ? ` (${record.medicines[0].strength})` : ''}
+              {record.medicines.length > 1 ? ` +${record.medicines.length - 1} more` : ''}
+            </p>
+          </div>
+        ) : record.medicinesOrNotes ? (
           <div className="flex items-start gap-1.5 bg-[#F8E9EC]/50 border border-[#8F1D2C]/15 rounded-lg p-2 mb-2 min-w-0">
             <Pill className="w-3.5 h-3.5 text-[#8F1D2C] shrink-0 mt-0.5" />
             <p className="text-[11px] text-[#17201D] font-medium line-clamp-2 min-w-0 leading-tight">
               {record.medicinesOrNotes}
             </p>
           </div>
-        )}
+        ) : null}
       </div>
 
       {/* Footer: Dates & Thumbnail indicator */}

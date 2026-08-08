@@ -208,7 +208,7 @@ export default function Home() {
                 For You & Family
               </h3>
               <p className="text-xs sm:text-sm text-[#68736F] leading-relaxed">
-                Manage health records for Self, Father, Mother, Wife, Child, and Sibling.
+                Manage health records for Self, Father, Mother, Wife, Husband, Child, and Sibling.
               </p>
             </div>
 

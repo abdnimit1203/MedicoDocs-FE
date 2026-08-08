@@ -4,9 +4,9 @@ import React from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { useAuth } from '@/context/AuthContext'
-import { LogIn, LogOut, Plus, FileText, Pill, Stethoscope, Activity, User } from 'lucide-react'
+import { LogOut, Plus, FileText, Pill, Activity, Sparkles, User } from 'lucide-react'
 
-export type NavTab = 'overview' | 'visits' | 'prescriptions' | 'test_reports' | 'profile'
+export type NavTab = 'overview' | 'prescriptions' | 'test_reports' | 'assistant' | 'profile'
 
 interface NavbarProps {
   onOpenCreateModal?: () => void
@@ -75,18 +75,6 @@ export function Navbar({
               </button>
 
               <button
-                onClick={() => onTabChange('visits')}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                  activeTab === 'visits'
-                    ? 'bg-[#8F1D2C] text-white shadow-xs'
-                    : 'text-[#68736F] hover:text-[#17201D]'
-                }`}
-              >
-                <Stethoscope className="w-3.5 h-3.5" />
-                <span>Visits</span>
-              </button>
-
-              <button
                 onClick={() => onTabChange('prescriptions')}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
                   activeTab === 'prescriptions'
@@ -108,6 +96,18 @@ export function Navbar({
               >
                 <Activity className="w-3.5 h-3.5" />
                 <span>Test Reports</span>
+              </button>
+
+              <button
+                onClick={() => onTabChange('assistant')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                  activeTab === 'assistant'
+                    ? 'bg-[#8F1D2C] text-white shadow-xs'
+                    : 'text-[#68736F] hover:text-[#17201D]'
+                }`}
+              >
+                <Sparkles className="w-3.5 h-3.5" />
+                <span>AI Assistant</span>
               </button>
 
               <button
@@ -219,18 +219,6 @@ export function Navbar({
           </button>
 
           <button
-            onClick={() => onTabChange('visits')}
-            className={`flex flex-col items-center justify-center gap-0.5 px-3 py-1 rounded-xl text-[11px] font-bold transition-all ${
-              activeTab === 'visits'
-                ? 'text-[#8F1D2C]'
-                : 'text-[#68736F] hover:text-[#17201D]'
-            }`}
-          >
-            <Stethoscope className={`w-4 h-4 ${activeTab === 'visits' ? 'text-[#8F1D2C]' : 'text-slate-400'}`} />
-            <span>Visits</span>
-          </button>
-
-          <button
             onClick={() => onTabChange('prescriptions')}
             className={`flex flex-col items-center justify-center gap-0.5 px-3 py-1 rounded-xl text-[11px] font-bold transition-all ${
               activeTab === 'prescriptions'
@@ -252,6 +240,18 @@ export function Navbar({
           >
             <Activity className={`w-4 h-4 ${activeTab === 'test_reports' ? 'text-[#8F1D2C]' : 'text-slate-400'}`} />
             <span>Test Reports</span>
+          </button>
+
+          <button
+            onClick={() => onTabChange('assistant')}
+            className={`flex flex-col items-center justify-center gap-0.5 px-3 py-1 rounded-xl text-[11px] font-bold transition-all ${
+              activeTab === 'assistant'
+                ? 'text-[#8F1D2C]'
+                : 'text-[#68736F] hover:text-[#17201D]'
+            }`}
+          >
+            <Sparkles className={`w-4 h-4 ${activeTab === 'assistant' ? 'text-[#8F1D2C]' : 'text-slate-400'}`} />
+            <span>Assistant</span>
           </button>
 
           <button

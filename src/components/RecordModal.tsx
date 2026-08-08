@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react'
 import { useAuth } from '@/context/AuthContext'
-import { fetchWithAuth, IMedicalRecord, DocumentType, ITestResultItem } from '@/lib/api'
+import { fetchWithAuth, IMedicalRecord, DocumentType, ITestResultItem, IMedicineItem } from '@/lib/api'
 import { toast } from 'react-hot-toast'
 import { DocumentScanner } from './DocumentScanner'
 import { LightboxViewer } from './LightboxViewer'
@@ -28,7 +28,34 @@ import {
   CheckCircle2,
   Activity,
   FlaskConical,
+  Search,
 } from 'lucide-react'
+
+/**
+ * A Gemini-extracted field that couldn't be read reliably is marked with a bracketed
+ * placeholder like "[Unclear - verify manually]" (see aiService.ts). Never treat that
+ * placeholder text as real data — in particular, never send it to an external search.
+ */
+function isUncertainValue(value?: string): boolean {
+  return !value || !value.trim() || value.trim().startsWith('[')
+}
+
+/**
+ * Opens a Google search restricted to medex.com.bd for the given medicine name
+ * (+ strength, when it's a real value rather than an unread-placeholder). Plain
+ * outbound browser navigation only — no backend fetch, no scraping, no stored
+ * MedEx data. MedEx has no official API and its own search is JS/API-driven with
+ * no stable deep-link URL, so this is the safest way to point a user at their
+ * listings without depending on internals we don't control.
+ */
+function buildMedicineSearchUrl(name: string, strength?: string): string {
+  const parts = [
+    isUncertainValue(name) ? '' : name.trim(),
+    isUncertainValue(strength) ? '' : strength!.trim(),
+  ].filter(Boolean)
+  const query = encodeURIComponent(`site:medex.com.bd ${parts.join(' ')}`.trim())
+  return `https://www.google.com/search?q=${query}`
+}
 
 interface RecordModalProps {
   isOpen: boolean
@@ -71,7 +98,7 @@ const DEFAULT_CLINICS = [
 
 export function RecordModal({
   isOpen,
-  initialDocumentType = 'visit',
+  initialDocumentType = 'prescription',
   record,
   existingRecords = [],
   onClose,
@@ -97,7 +124,9 @@ export function RecordModal({
     dimensions?: { width?: number; height?: number }
   }>({})
 
-  // Medical Visit Specific Fields
+  // Legacy fields — no longer editable via the UI (the "visit" type is retired), kept only so a
+  // pre-migration record that still has them doesn't lose data. followUpDate still displays
+  // read-only in VIEW mode if present.
   const [testsOrdered, setTestsOrdered] = useState('')
   const [followUpDate, setFollowUpDate] = useState('')
 
@@ -112,9 +141,7 @@ export function RecordModal({
   const [flagInput, setFlagInput] = useState('NORMAL')
 
   // Medicines & Clinical Notes
-  const [medicineInput, setMedicineInput] = useState('')
-  const [dosageInput, setDosageInput] = useState('')
-  const [medicinesList, setMedicinesList] = useState<{ name: string; dosage: string }[]>([])
+  const [medicinesList, setMedicinesList] = useState<IMedicineItem[]>([])
   const [clinicalNotes, setClinicalNotes] = useState('')
 
   // Gemini AI Analysis State
@@ -191,7 +218,18 @@ export function RecordModal({
 
     if (record) {
       setMode('VIEW')
-      setDocumentType(record.documentType || 'visit')
+      // Straggler pre-migration 'visit' records have no dedicated form anymore — display them
+      // as whichever of the two current types their data actually looks like (same heuristic
+      // as the migration script), so opening one doesn't silently hide existing data.
+      const looksLikeTestReport =
+        (record.testResults && record.testResults.length > 0) || !!record.testName || !!record.labName
+      setDocumentType(
+        record.documentType === 'visit'
+          ? looksLikeTestReport
+            ? 'test_report'
+            : 'prescription'
+          : record.documentType || 'prescription'
+      )
       setPatientName(record.patientName || '')
       setRelationship(record.relationship || 'Self')
       setDoctorName(record.doctorName || '')
@@ -209,7 +247,7 @@ export function RecordModal({
       setLabName(record.labName || '')
       setTestResults(record.testResults || [])
       setClinicalNotes(record.medicinesOrNotes || '')
-      setMedicinesList([])
+      setMedicinesList(record.medicines || [])
     } else {
       setMode('CREATE')
       setDocumentType(initialDocumentType)
@@ -273,8 +311,7 @@ export function RecordModal({
           if (Array.isArray(aiData.testResults)) setTestResults(aiData.testResults)
 
           setAiSuccessMessage(
-            `✨ Gemini AI Analysis Complete: Extracted test report details and ${
-              aiData.testResults?.length || 0
+            `✨ Gemini AI Analysis Complete: Extracted test report details and ${aiData.testResults?.length || 0
             } parameter measurement(s). Please review and edit before saving.`
           )
           toast.success('✨ Gemini AI Test Report extraction complete!')
@@ -290,24 +327,18 @@ export function RecordModal({
           if (aiData.clinicalNotes) setClinicalNotes(aiData.clinicalNotes)
 
           if (Array.isArray(aiData.medicines) && aiData.medicines.length > 0) {
-            const formattedMeds = aiData.medicines.map((m: any) => {
-              const dosageParts = [
-                m.strength,
-                m.frequency,
-                m.duration,
-                m.instructions,
-              ].filter(Boolean)
-              return {
-                name: m.name || 'Prescription Item',
-                dosage: dosageParts.join(' | '),
-              }
-            })
-            setMedicinesList(formattedMeds)
+            const structuredMeds: IMedicineItem[] = aiData.medicines.map((m: any) => ({
+              name: m.name || 'Prescription Item',
+              strength: m.strength || undefined,
+              frequency: m.frequency || undefined,
+              duration: m.duration || undefined,
+              instructions: m.instructions || undefined,
+            }))
+            setMedicinesList(structuredMeds)
           }
 
           setAiSuccessMessage(
-            `✨ Gemini AI Analysis Complete: Extracted prescription details and ${
-              aiData.medicines?.length || 0
+            `✨ Gemini AI Analysis Complete: Extracted prescription details and ${aiData.medicines?.length || 0
             } medicine(s). Please review and edit before saving.`
           )
           toast.success('✨ Gemini AI Prescription extraction complete!')
@@ -329,14 +360,14 @@ export function RecordModal({
     }
   }
 
-  const handleAddMedicine = () => {
-    if (!medicineInput.trim()) return
-    setMedicinesList([
-      ...medicinesList,
-      { name: medicineInput.trim(), dosage: dosageInput.trim() },
-    ])
-    setMedicineInput('')
-    setDosageInput('')
+  const handleAddBlankMedicine = () => {
+    setMedicinesList([...medicinesList, { name: '' }])
+  }
+
+  const handleUpdateMedicine = (index: number, field: keyof IMedicineItem, value: string) => {
+    setMedicinesList(
+      medicinesList.map((m, i) => (i === index ? { ...m, [field]: value } : m))
+    )
   }
 
   const handleRemoveMedicine = (index: number) => {
@@ -366,17 +397,6 @@ export function RecordModal({
     setTestResults(testResults.filter((_, i) => i !== index))
   }
 
-  const serializeMedicinesAndNotes = (): string => {
-    const medText = medicinesList.map((m) => `• ${m.name}${m.dosage ? ` (${m.dosage})` : ''}`).join('\n')
-    if (medText && clinicalNotes.trim()) {
-      return `Prescribed Medicines:\n${medText}\n\nClinical Notes:\n${clinicalNotes.trim()}`
-    } else if (medText) {
-      return `Prescribed Medicines:\n${medText}`
-    } else {
-      return clinicalNotes.trim()
-    }
-  }
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!patientName.trim()) {
@@ -386,7 +406,6 @@ export function RecordModal({
 
     setIsSaving(true)
     try {
-      const combinedNotes = serializeMedicinesAndNotes()
       await onSave({
         _id: record?._id,
         patientName: patientName.trim(),
@@ -398,7 +417,8 @@ export function RecordModal({
         visitDate: visitDate || undefined,
         prescriptionDate: prescriptionDate || undefined,
         category,
-        medicinesOrNotes: combinedNotes,
+        medicinesOrNotes: clinicalNotes.trim(),
+        medicines: medicinesList.filter((m) => m.name.trim()),
         imageRef,
         testName: testName.trim(),
         labName: labName.trim(),
@@ -462,10 +482,10 @@ export function RecordModal({
                 )}
                 <span>
                   {mode === 'VIEW'
-                    ? `${documentType === 'prescription' ? 'Prescription' : documentType === 'test_report' ? 'Test Report' : 'Medical Visit'} Details`
+                    ? `${documentType === 'prescription' ? 'Prescription' : 'Test Report'} Details`
                     : mode === 'EDIT'
-                    ? `Edit ${documentType === 'prescription' ? 'Prescription' : documentType === 'test_report' ? 'Test Report' : 'Medical Visit'}`
-                    : `New ${documentType === 'prescription' ? 'Prescription' : documentType === 'test_report' ? 'Test Report' : 'Medical Visit'}`}
+                      ? `Edit ${documentType === 'prescription' ? 'Prescription' : 'Test Report'}`
+                      : `New ${documentType === 'prescription' ? 'Prescription' : 'Test Report'}`}
                 </span>
               </h2>
             </div>
@@ -550,7 +570,7 @@ export function RecordModal({
                   {visitDate && (
                     <div className="bg-white p-2.5 rounded-xl border border-slate-200 space-y-0.5">
                       <span className="text-[10px] font-bold text-[#68736F] uppercase tracking-wider block">
-                        {documentType === 'prescription' ? 'Rx Date' : documentType === 'test_report' ? 'Report Date' : 'Visit Date'}
+                        {documentType === 'prescription' ? 'Rx Date' : 'Report Date'}
                       </span>
                       <div className="flex items-center gap-1.5 font-bold text-[#17201D]">
                         <Calendar className="w-3.5 h-3.5 text-[#3B988E]" />
@@ -617,22 +637,42 @@ export function RecordModal({
                     <span>Prescribed Medicines ({medicinesList.length})</span>
                   </span>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                    {medicinesList.map((med, idx) => (
-                      <div
-                        key={idx}
-                        className="p-2.5 bg-[#F8E9EC]/70 border border-[#8F1D2C]/20 rounded-xl flex items-start gap-2 text-xs shadow-2xs"
-                      >
-                        <Pill className="w-4 h-4 text-[#8F1D2C] shrink-0 mt-0.5" />
-                        <div className="min-w-0">
-                          <span className="font-extrabold text-[#8F1D2C] block truncate">{med.name}</span>
-                          {med.dosage && (
-                            <span className="text-[11px] font-semibold text-[#68736F] block mt-0.5">
-                              {med.dosage}
-                            </span>
-                          )}
+                    {medicinesList.map((med, idx) => {
+                      const dosageLine = [med.strength, med.frequency, med.duration]
+                        .filter(Boolean)
+                        .join(' · ')
+                      return (
+                        <div
+                          key={idx}
+                          className="p-2.5 bg-[#F8E9EC]/70 border border-[#8F1D2C]/20 rounded-xl flex items-start gap-2 text-xs shadow-2xs"
+                        >
+                          <Pill className="w-4 h-4 text-[#8F1D2C] shrink-0 mt-0.5" />
+                          <div className="min-w-0">
+                            <span className="font-extrabold text-[#8F1D2C] block truncate">{med.name}</span>
+                            {dosageLine && (
+                              <span className="text-[11px] font-semibold text-[#68736F] block mt-0.5">
+                                {dosageLine}
+                              </span>
+                            )}
+                            {med.instructions && (
+                              <span className="text-[11px] text-[#68736F]/80 block mt-0.5">
+                                {med.instructions}
+                              </span>
+                            )}
+                            <a
+                              href={buildMedicineSearchUrl(med.name, med.strength)}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              onClick={(e) => e.stopPropagation()}
+                              className="mt-1.5 inline-flex items-center gap-1 text-[10px] font-bold text-[#3B988E] hover:underline"
+                            >
+                              <Search className="w-3 h-3" />
+                              <span>Search medicine</span>
+                            </a>
+                          </div>
                         </div>
-                      </div>
-                    ))}
+                      )
+                    })}
                   </div>
                 </div>
               )}
@@ -825,6 +865,7 @@ export function RecordModal({
                     <option value="Father">Father</option>
                     <option value="Mother">Mother</option>
                     <option value="Wife">Wife</option>
+                    <option value="Husband">Husband</option>
                     <option value="Child">Child</option>
                     <option value="Sibling">Sibling</option>
                     <option value="Other">Other</option>
@@ -946,7 +987,7 @@ export function RecordModal({
                   </div>
                 </div>
               ) : (
-                /* 2. MEDICAL VISIT / PRESCRIPTION COMMON FORM */
+                /* 2. PRESCRIPTION FORM */
                 <div className="space-y-3">
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                     {/* Doctor Name */}
@@ -1043,7 +1084,7 @@ export function RecordModal({
 
                     <div>
                       <label className="block text-xs font-semibold text-[#17201D] mb-1">
-                        {documentType === 'prescription' ? 'Prescription Date' : 'Visit Date'}
+                        Prescription Date
                       </label>
                       <input
                         type="date"
@@ -1054,95 +1095,99 @@ export function RecordModal({
                     </div>
                   </div>
 
-                  {/* Additional Medical Visit Fields */}
-                  {documentType === 'visit' && (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                      <div>
-                        <label className="block text-xs font-semibold text-[#17201D] mb-1">
-                          Tests Ordered
-                        </label>
-                        <input
-                          type="text"
-                          placeholder="e.g. Blood Test, X-Ray"
-                          value={testsOrdered}
-                          onChange={(e) => setTestsOrdered(e.target.value)}
-                          className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs text-[#17201D]"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-xs font-semibold text-[#17201D] mb-1">
-                          Follow-up Date
-                        </label>
-                        <input
-                          type="date"
-                          value={followUpDate}
-                          onChange={(e) => setFollowUpDate(e.target.value)}
-                          className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs text-[#17201D]"
-                        />
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Prescribed Medicines Entry */}
+                  {/* Prescribed Medicines Entry — every row (Gemini-extracted or manually added) is
+                      fully editable in place; nothing needs to be deleted and re-added to fix a field. */}
                   <div className="space-y-3 bg-[#F8F9F7] p-3 rounded-xl border border-slate-200">
                     <div className="flex items-center justify-between">
                       <label className="text-xs font-bold text-[#17201D] flex items-center gap-1.5">
                         <Pill className="w-3.5 h-3.5 text-[#8F1D2C]" />
-                        <span>Prescribed Medicines</span>
+                        <span>Prescribed Medicines {medicinesList.length > 0 ? `(${medicinesList.length})` : ''}</span>
                       </label>
-                    </div>
-
-                    <div className="flex items-center gap-1.5">
-                      <input
-                        type="text"
-                        placeholder="Medicine name"
-                        value={medicineInput}
-                        onChange={(e) => setMedicineInput(e.target.value)}
-                        className="flex-1 min-w-0 px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg text-xs"
-                      />
-                      <input
-                        type="text"
-                        placeholder="Dosage (500mg 3x/day)"
-                        value={dosageInput}
-                        onChange={(e) => setDosageInput(e.target.value)}
-                        className="w-32 sm:w-36 px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg text-xs"
-                      />
                       <button
                         type="button"
-                        onClick={handleAddMedicine}
-                        className="px-2.5 py-1.5 bg-[#8F1D2C] hover:bg-[#741522] text-white rounded-lg text-xs font-bold flex items-center gap-1 shrink-0"
+                        onClick={handleAddBlankMedicine}
+                        className="px-2.5 py-1 bg-[#8F1D2C] hover:bg-[#741522] text-white rounded-lg text-[11px] font-bold flex items-center gap-1 shrink-0"
                       >
                         <Plus className="w-3.5 h-3.5" />
-                        <span>Add</span>
+                        <span>Add Medicine</span>
                       </button>
                     </div>
 
-                    {medicinesList.length > 0 && (
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+                    {medicinesList.length > 0 ? (
+                      <div className="space-y-2">
                         {medicinesList.map((m, idx) => (
                           <div
                             key={idx}
-                            className="flex items-center justify-between p-2.5 bg-white border border-slate-200 rounded-xl text-xs shadow-2xs"
+                            className="p-2.5 bg-white border border-slate-200 rounded-xl text-xs shadow-2xs space-y-1.5"
                           >
-                            <div className="flex items-center gap-2 min-w-0">
+                            <div className="flex items-center gap-1.5">
                               <Pill className="w-3.5 h-3.5 text-[#8F1D2C] shrink-0" />
-                              <div className="min-w-0">
-                                <span className="font-bold text-[#17201D] block truncate">{m.name}</span>
-                                {m.dosage && <span className="text-[11px] text-[#68736F] block">{m.dosage}</span>}
-                              </div>
+                              <input
+                                type="text"
+                                placeholder="Medicine name"
+                                value={m.name}
+                                onChange={(e) => handleUpdateMedicine(idx, 'name', e.target.value)}
+                                className="flex-1 min-w-0 px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg text-xs font-bold"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveMedicine(idx)}
+                                className="p-1 rounded-md text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors shrink-0"
+                                title="Remove medicine"
+                              >
+                                <X className="w-3.5 h-3.5" />
+                              </button>
                             </div>
-                            <button
-                              type="button"
-                              onClick={() => handleRemoveMedicine(idx)}
-                              className="p-1 rounded-md text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors shrink-0"
-                              title="Remove item"
-                            >
-                              <X className="w-3.5 h-3.5" />
-                            </button>
+
+                            <div className="grid grid-cols-2 gap-1.5 pl-5">
+                              <input
+                                type="text"
+                                placeholder="Strength (e.g. 500mg)"
+                                value={m.strength || ''}
+                                onChange={(e) => handleUpdateMedicine(idx, 'strength', e.target.value)}
+                                className="px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg text-xs"
+                              />
+                              <input
+                                type="text"
+                                placeholder="Frequency (e.g. 1-0-1)"
+                                value={m.frequency || ''}
+                                onChange={(e) => handleUpdateMedicine(idx, 'frequency', e.target.value)}
+                                className="px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg text-xs"
+                              />
+                              <input
+                                type="text"
+                                placeholder="Duration (e.g. 5 days)"
+                                value={m.duration || ''}
+                                onChange={(e) => handleUpdateMedicine(idx, 'duration', e.target.value)}
+                                className="px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg text-xs"
+                              />
+                              <input
+                                type="text"
+                                placeholder="Instructions (optional)"
+                                value={m.instructions || ''}
+                                onChange={(e) => handleUpdateMedicine(idx, 'instructions', e.target.value)}
+                                className="px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg text-xs"
+                              />
+                            </div>
+
+                            {m.name.trim() && (
+                              <a
+                                href={buildMedicineSearchUrl(m.name, m.strength)}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="ml-5 inline-flex items-center gap-1 text-[10px] font-bold text-[#3B988E] hover:underline"
+                              >
+                                <Search className="w-3 h-3" />
+                                <span>Search medicine</span>
+                              </a>
+                            )}
                           </div>
                         ))}
                       </div>
+                    ) : (
+                      <p className="text-[11px] text-[#68736F] text-center py-2">
+                        No medicines added yet. Scan with Gemini AI or tap "Add Medicine" above.
+                      </p>
                     )}
                   </div>
                 </div>
@@ -1181,8 +1226,8 @@ export function RecordModal({
                     {isSaving
                       ? 'Saving...'
                       : mode === 'EDIT'
-                      ? 'Save Changes'
-                      : 'Save Record'}
+                        ? 'Save Changes'
+                        : 'Save Record'}
                   </span>
                 </button>
               </div>

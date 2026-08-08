@@ -11,6 +11,7 @@ import { RecordCard } from '@/components/RecordCard'
 import { RecordModal } from '@/components/RecordModal'
 import { AddTypeSelectorModal } from '@/components/AddTypeSelectorModal'
 import { MedicalTimeline } from '@/components/MedicalTimeline'
+import { AssistantChat } from '@/components/AssistantChat'
 import {
   Search,
   Plus,
@@ -28,8 +29,7 @@ import {
   Mail,
 } from 'lucide-react'
 
-const RELATIONSHIPS = ['All', 'Self', 'Father', 'Mother', 'Wife', 'Child', 'Sibling', 'Other']
-const CATEGORIES = ['All', 'General', 'Disease', 'Condition', 'Specialty']
+const RELATIONSHIPS = ['All', 'Self', 'Father', 'Mother', 'Wife', 'Husband', 'Child', 'Sibling', 'Other']
 
 export default function DashboardPage() {
   const { user, dbUser, authInitializing, getToken, logout } = useAuth()
@@ -44,14 +44,13 @@ export default function DashboardPage() {
   const [searchQuery, setSearchQuery] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
   const [selectedRelationship, setSelectedRelationship] = useState('All')
-  const [selectedCategory, setSelectedCategory] = useState('All')
   const [activeTab, setActiveTab] = useState<NavTab>('overview')
   const [isTimelineView, setIsTimelineView] = useState(false)
 
   // Modals State
   const [isTypeSelectorOpen, setIsTypeSelectorOpen] = useState(false)
   const [isRecordModalOpen, setIsRecordModalOpen] = useState(false)
-  const [selectedDocType, setSelectedDocType] = useState<DocumentType>('visit')
+  const [selectedDocType, setSelectedDocType] = useState<DocumentType>('prescription')
   const [activeRecord, setActiveRecord] = useState<IMedicalRecord | null>(null)
 
   // Auth Protection Guard
@@ -84,7 +83,6 @@ export default function DashboardPage() {
       const params = new URLSearchParams()
       if (debouncedSearch) params.append('search', debouncedSearch)
       if (selectedRelationship !== 'All') params.append('relationship', selectedRelationship)
-      if (selectedCategory !== 'All') params.append('category', selectedCategory)
 
       const endpoint = `/records?${params.toString()}`
       const response = await fetchWithAuth(endpoint, token)
@@ -105,7 +103,7 @@ export default function DashboardPage() {
       setIsSearching(false)
       setInitialFetchDone(true)
     }
-  }, [user, getToken, debouncedSearch, selectedRelationship, selectedCategory, initialFetchDone, logout])
+  }, [user, getToken, debouncedSearch, selectedRelationship, initialFetchDone, logout])
 
   useEffect(() => {
     if (user && !authInitializing) {
@@ -113,11 +111,8 @@ export default function DashboardPage() {
     }
   }, [user, authInitializing, loadRecords])
 
-  // Filter records by Section Tab (Overview, Visits, Prescriptions, Test Reports)
+  // Filter records by Section Tab (Overview, Prescriptions, Test Reports)
   const tabFilteredRecords = useMemo(() => {
-    if (activeTab === 'visits') {
-      return records.filter((r) => r.documentType === 'visit')
-    }
     if (activeTab === 'prescriptions') {
       return records.filter((r) => r.documentType === 'prescription')
     }
@@ -131,9 +126,6 @@ export default function DashboardPage() {
   const filteredRecords = useMemo(() => {
     return tabFilteredRecords.filter((rec) => {
       if (selectedRelationship !== 'All' && rec.relationship !== selectedRelationship) {
-        return false
-      }
-      if (selectedCategory !== 'All' && rec.category !== selectedCategory) {
         return false
       }
       if (searchQuery.trim()) {
@@ -159,7 +151,7 @@ export default function DashboardPage() {
       }
       return true
     })
-  }, [tabFilteredRecords, selectedRelationship, selectedCategory, searchQuery])
+  }, [tabFilteredRecords, selectedRelationship, searchQuery])
 
   const handleSaveRecord = async (recordData: Partial<IMedicalRecord>) => {
     const token = await getToken()
@@ -263,6 +255,9 @@ export default function DashboardPage() {
               <span>Sign Out of MedicoDocs</span>
             </button>
           </div>
+        ) : activeTab === 'assistant' ? (
+          /* AI ASSISTANT SECTION VIEW */
+          <AssistantChat />
         ) : (
           /* RECORDS / VISITS / PRESCRIPTIONS / REPORTS SECTION VIEW */
           <>
@@ -285,11 +280,10 @@ export default function DashboardPage() {
 
                 <button
                   onClick={() => setIsTimelineView(!isTimelineView)}
-                  className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-2 rounded-xl border text-xs font-bold transition-all shrink-0 ${
-                    isTimelineView
+                  className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-2 rounded-xl border text-xs font-bold transition-all shrink-0 ${isTimelineView
                       ? 'bg-[#F8E9EC] text-[#8F1D2C] border-[#8F1D2C]/30 shadow-xs'
                       : 'bg-white text-[#68736F] border-slate-200 hover:text-[#17201D] shadow-xs'
-                  }`}
+                    }`}
                 >
                   <Calendar className="w-3.5 h-3.5 shrink-0" />
                   <span className="hidden xs:inline">Timeline</span>
@@ -305,33 +299,12 @@ export default function DashboardPage() {
                   <button
                     key={rel}
                     onClick={() => setSelectedRelationship(rel)}
-                    className={`px-2.5 sm:px-3 py-1 rounded-full text-xs font-semibold transition-all shrink-0 border ${
-                      selectedRelationship === rel
+                    className={`px-2.5 sm:px-3 py-1 rounded-full text-xs font-semibold transition-all shrink-0 border ${selectedRelationship === rel
                         ? 'bg-[#8F1D2C] text-white border-[#8F1D2C] shadow-xs font-bold'
                         : 'bg-white text-[#68736F] border-slate-200 hover:text-[#17201D]'
-                    }`}
+                      }`}
                   >
                     {rel}
-                  </button>
-                ))}
-              </div>
-
-              {/* Category Filter Pills */}
-              <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5 w-full min-w-0">
-                <span className="text-[11px] font-bold text-[#68736F] shrink-0 pr-1">
-                  Category:
-                </span>
-                {CATEGORIES.map((cat) => (
-                  <button
-                    key={cat}
-                    onClick={() => setSelectedCategory(cat)}
-                    className={`px-2 sm:px-2.5 py-0.5 rounded-md text-[11px] font-semibold transition-all shrink-0 border ${
-                      selectedCategory === cat
-                        ? 'bg-slate-200 text-[#17201D] border-slate-300 font-bold'
-                        : 'bg-white text-[#68736F] border-slate-200 hover:text-[#17201D]'
-                    }`}
-                  >
-                    {cat}
                   </button>
                 ))}
               </div>
@@ -343,7 +316,7 @@ export default function DashboardPage() {
                 records={filteredRecords}
                 onSelectRecord={(rec) => {
                   setActiveRecord(rec)
-                  setSelectedDocType(rec.documentType || 'visit')
+                  setSelectedDocType(rec.documentType === 'visit' ? 'prescription' : rec.documentType || 'prescription')
                   setIsRecordModalOpen(true)
                 }}
               />
@@ -364,7 +337,7 @@ export default function DashboardPage() {
                     record={rec}
                     onClick={(r) => {
                       setActiveRecord(r)
-                      setSelectedDocType(r.documentType || 'visit')
+                      setSelectedDocType(r.documentType === 'visit' ? 'prescription' : r.documentType || 'prescription')
                       setIsRecordModalOpen(true)
                     }}
                   />
@@ -379,12 +352,12 @@ export default function DashboardPage() {
 
                 <div className="space-y-1">
                   <h3 className="text-base font-extrabold text-[#17201D]">
-                    {searchQuery.trim() || selectedRelationship !== 'All' || selectedCategory !== 'All'
+                    {searchQuery.trim() || selectedRelationship !== 'All'
                       ? 'No matching records found'
                       : `No ${activeTab.replace('_', ' ')} recorded yet`}
                   </h3>
                   <p className="text-xs text-[#68736F] leading-relaxed max-w-xs mx-auto">
-                    {searchQuery.trim() || selectedRelationship !== 'All' || selectedCategory !== 'All'
+                    {searchQuery.trim() || selectedRelationship !== 'All'
                       ? 'Try clearing your search query or filter pills to see all medical records.'
                       : 'Add your first medical record, prescription, or lab test report to keep your family health organized.'}
                   </p>
@@ -392,10 +365,9 @@ export default function DashboardPage() {
 
                 <button
                   onClick={() => {
-                    if (searchQuery.trim() || selectedRelationship !== 'All' || selectedCategory !== 'All') {
+                    if (searchQuery.trim() || selectedRelationship !== 'All') {
                       setSearchQuery('')
                       setSelectedRelationship('All')
-                      setSelectedCategory('All')
                     } else {
                       setIsTypeSelectorOpen(true)
                     }
@@ -404,7 +376,7 @@ export default function DashboardPage() {
                 >
                   <Plus className="w-4 h-4" />
                   <span>
-                    {searchQuery.trim() || selectedRelationship !== 'All' || selectedCategory !== 'All'
+                    {searchQuery.trim() || selectedRelationship !== 'All'
                       ? 'Clear Search & Filters'
                       : '+ Add First Record'}
                   </span>
