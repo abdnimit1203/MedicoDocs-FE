@@ -6,7 +6,8 @@
 
 ## 🚀 Live Demo & Deployment
 
-* **Live Application:** `[Coming Soon / Live Link Placeholder]`
+* **Live Application:** `[Deploying on Vercel...]`
+* **Live Backend API:** [https://medico-docs-ab-be.vercel.app](https://medico-docs-ab-be.vercel.app)
 * **Backend API Repository:** [https://github.com/abdnimit1203/MedicoDocs-BE](https://github.com/abdnimit1203/MedicoDocs-BE)
 * **Frontend Repository:** [https://github.com/abdnimit1203/MedicoDocs-FE](https://github.com/abdnimit1203/MedicoDocs-FE)
 
