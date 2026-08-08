@@ -195,9 +195,9 @@ export function Navbar({
         </button>
       )}
 
-      {/* Fixed Bottom Navigation Bar for Authenticated Users */}
+      {/* Fixed Bottom Navigation Bar for Mobile Devices */}
       {user && onTabChange && (
-        <nav className="fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-md border-t border-slate-200 py-1.5 px-2 shadow-lg flex items-center justify-around max-w-5xl mx-auto">
+        <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-md border-t border-slate-200 py-1.5 px-2 shadow-lg flex items-center justify-around max-w-5xl mx-auto">
           <button
             onClick={() => onTabChange('overview')}
             className={`flex flex-col items-center justify-center gap-0.5 px-3 py-1 rounded-xl text-[11px] font-bold transition-all ${
