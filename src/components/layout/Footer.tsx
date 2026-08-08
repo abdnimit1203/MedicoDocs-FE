@@ -17,7 +17,7 @@ export function Footer() {
           <Bot className="w-3.5 h-3.5 text-[#3B988E] animate-bounce" />
           <span>by</span>
           <Link
-            href="https://abdullah-portfolio-frontend.netlify.app/"
+            href="https://abdullah-ibne-ali.netlify.app/"
             target="_blank"
             className="font-bold text-[#8F1D2C] hover:text-[#741522] transition-colors"
           >
