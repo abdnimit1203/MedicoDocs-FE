@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/context/AuthContext'
 import { Navbar } from '@/components/Navbar'
+import { Footer } from '@/components/layout/Footer'
 import {
   ShieldCheck,
   FileText,
@@ -27,10 +28,10 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-[#F8F9F7] text-[#17201D] font-sans flex flex-col justify-between w-full max-w-full overflow-x-hidden">
-      <div>
+      <div className="flex-1">
         <Navbar />
 
-        <main className="max-w-4xl mx-auto px-3 sm:px-4 pt-4 sm:pt-8 space-y-8 sm:space-y-12 w-full min-w-0">
+        <main className="max-w-4xl mx-auto px-3 sm:px-4 pt-4 sm:pt-8 pb-12 space-y-8 sm:space-y-12 w-full min-w-0">
           {/* Hero Section with Subtle Medical Red Stripe Pattern */}
           <section className="bg-white border border-slate-200 rounded-3xl p-6 sm:p-10 text-center relative overflow-hidden shadow-xs bg-medical-stripes">
             <div className="max-w-xl mx-auto space-y-4 sm:space-y-5 relative z-10">
@@ -79,7 +80,7 @@ export default function Home() {
             </div>
           </section>
 
-          {/* 4 Product Explanation Feature Cards */}
+          {/* 4 Product Feature Cards */}
           <section className="space-y-4">
             <div className="text-center space-y-1">
               <h2 className="text-lg sm:text-xl font-extrabold text-[#17201D]">
@@ -139,15 +140,8 @@ export default function Home() {
         </main>
       </div>
 
-      {/* Clean Footer */}
-      <footer className="mt-12 py-6 border-t border-slate-200 text-center text-xs text-[#68736F]">
-        <div className="max-w-4xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-2">
-          <p className="font-semibold text-[#17201D]">
-            <span className="text-[#8F1D2C]">Medico</span><span className="text-[#3B988E]">Docs</span> <span className="text-xs font-normal text-[#68736F]">by AB</span>
-          </p>
-          <p>© {new Date().getFullYear()} MedicoDocs. Your health. Organized. Secure.</p>
-        </div>
-      </footer>
+      {/* Signature Footer matching CipherVault-FE */}
+      <Footer />
     </div>
   )
 }

@@ -6,6 +6,7 @@ import { useAuth } from '@/context/AuthContext'
 import { fetchWithAuth, IMedicalRecord, DocumentType } from '@/lib/api'
 import { toast } from 'react-hot-toast'
 import { Navbar, NavTab } from '@/components/Navbar'
+import { Footer } from '@/components/layout/Footer'
 import { RecordCard } from '@/components/RecordCard'
 import { RecordModal } from '@/components/RecordModal'
 import { AddTypeSelectorModal } from '@/components/AddTypeSelectorModal'
@@ -436,6 +437,8 @@ export default function DashboardPage() {
         onSave={handleSaveRecord}
         onDelete={handleDeleteRecord}
       />
+
+      <Footer />
     </div>
   )
 }
