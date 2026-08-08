@@ -29,6 +29,7 @@ export interface IDbUser {
 interface AuthContextType {
   user: User | null
   dbUser: IDbUser | null
+  authInitializing: boolean
   loading: boolean
   loginWithGoogle: () => Promise<void>
   loginWithEmail: (email: string, pass: string) => Promise<void>
@@ -40,6 +41,7 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType>({
   user: null,
   dbUser: null,
+  authInitializing: true,
   loading: true,
   loginWithGoogle: async () => {},
   loginWithEmail: async () => {},
@@ -51,7 +53,7 @@ const AuthContext = createContext<AuthContextType>({
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [dbUser, setDbUser] = useState<IDbUser | null>(null)
-  const [loading, setLoading] = useState(true)
+  const [authInitializing, setAuthInitializing] = useState(true)
 
   const syncUserWithBackend = async (currentUser: User, extraInfo?: { displayName?: string; provider?: string }) => {
     try {
@@ -69,7 +71,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setDbUser(syncRes.data)
       }
     } catch (err) {
-      console.warn('Backend user sync error:', err)
+      console.warn('Backend user sync non-blocking warning:', err)
     }
   }
 
@@ -80,12 +82,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       setUser(currentUser)
+      setAuthInitializing(false)
+
       if (currentUser) {
-        await syncUserWithBackend(currentUser)
+        syncUserWithBackend(currentUser)
       } else {
         setDbUser(null)
       }
-      setLoading(false)
     })
     return () => unsubscribe()
   }, [])
@@ -129,11 +132,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const logout = async () => {
     try {
-      await firebaseSignOut(auth)
       setUser(null)
       setDbUser(null)
+      await firebaseSignOut(auth)
+      // Perform hard redirect to landing page to completely purge state & caches
+      window.location.href = '/'
     } catch (err) {
       console.error('Logout Error:', err)
+      window.location.href = '/'
     }
   }
 
@@ -152,7 +158,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       value={{
         user,
         dbUser,
-        loading,
+        authInitializing,
+        loading: authInitializing,
         loginWithGoogle,
         loginWithEmail,
         registerWithEmail,

@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect, useCallback } from 'react'
+import React, { useState, useEffect, useCallback, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/context/AuthContext'
 import { fetchWithAuth, IMedicalRecord } from '@/lib/api'
@@ -18,18 +18,24 @@ import {
   Bot,
   Loader2,
   FolderPlus,
+  AlertCircle,
 } from 'lucide-react'
 
 const RELATIONSHIPS = ['All', 'Self', 'Father', 'Mother', 'Wife', 'Child', 'Sibling', 'Other']
 const CATEGORIES = ['All', 'General', 'Disease', 'Condition', 'Specialty']
 
 export default function DashboardPage() {
-  const { user, loading: authLoading, getToken } = useAuth()
+  const { user, authInitializing, getToken, logout } = useAuth()
   const router = useRouter()
 
   const [records, setRecords] = useState<IMedicalRecord[]>([])
+  const [initialFetchDone, setInitialFetchDone] = useState(false)
   const [loadingRecords, setLoadingRecords] = useState(false)
+  const [isSearching, setIsSearching] = useState(false)
+  const [fetchError, setFetchError] = useState<string | null>(null)
+
   const [searchQuery, setSearchQuery] = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
   const [selectedRelationship, setSelectedRelationship] = useState('All')
   const [selectedCategory, setSelectedCategory] = useState('All')
   const [activeTab, setActiveTab] = useState<'all' | 'prescriptions' | 'timeline'>('all')
@@ -40,19 +46,33 @@ export default function DashboardPage() {
 
   // Auth Protection Guard
   useEffect(() => {
-    if (!authLoading && !user) {
-      router.push('/login')
+    if (!authInitializing && !user) {
+      router.replace('/login')
     }
-  }, [user, authLoading, router])
+  }, [user, authInitializing, router])
 
+  // Debounce search input (300ms)
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedSearch(searchQuery.trim())
+    }, 300)
+    return () => clearTimeout(handler)
+  }, [searchQuery])
+
+  // Fetch records from backend
   const loadRecords = useCallback(async () => {
     if (!user) return
-    setLoadingRecords(true)
+    if (!initialFetchDone) {
+      setLoadingRecords(true)
+    } else {
+      setIsSearching(true)
+    }
+    setFetchError(null)
 
     try {
       const token = await getToken()
       const params = new URLSearchParams()
-      if (searchQuery.trim()) params.append('search', searchQuery.trim())
+      if (debouncedSearch) params.append('search', debouncedSearch)
       if (selectedRelationship !== 'All') params.append('relationship', selectedRelationship)
       if (selectedCategory !== 'All') params.append('category', selectedCategory)
 
@@ -62,18 +82,49 @@ export default function DashboardPage() {
       if (response.success) {
         setRecords(response.data || [])
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error fetching records:', err)
-    } finally {
+      if (err.status === 401) {
+        setFetchError('Session expired. Redirecting to login...')
+        setTimeout(() => logout(), 1500)
+      } else {
+        setFetchError(err.message || 'Failed to load medical records.')
+      }
+    } fontally: {
       setLoadingRecords(false)
+      setIsSearching(false)
+      setInitialFetchDone(true)
     }
-  }, [user, getToken, searchQuery, selectedRelationship, selectedCategory])
+  }, [user, getToken, debouncedSearch, selectedRelationship, selectedCategory, initialFetchDone, logout])
 
   useEffect(() => {
-    if (user) {
+    if (user && !authInitializing) {
       loadRecords()
     }
-  }, [user, loadRecords])
+  }, [user, authInitializing, loadRecords])
+
+  // Instant Client-Side Filter for zero-delay UX while debounced query runs
+  const filteredRecords = useMemo(() => {
+    return records.filter((rec) => {
+      if (selectedRelationship !== 'All' && rec.relationship !== selectedRelationship) {
+        return false
+      }
+      if (selectedCategory !== 'All' && rec.category !== selectedCategory) {
+        return false
+      }
+      if (searchQuery.trim()) {
+        const q = searchQuery.trim().toLowerCase()
+        const matchName = rec.patientName?.toLowerCase().includes(q)
+        const matchDoctor = rec.doctorName?.toLowerCase().includes(q)
+        const matchSpecialty = rec.doctorSpecialty?.toLowerCase().includes(q)
+        const matchClinic = rec.clinicLocation?.toLowerCase().includes(q)
+        const matchNotes = rec.medicinesOrNotes?.toLowerCase().includes(q)
+        const matchCat = rec.category?.toLowerCase().includes(q)
+        return matchName || matchDoctor || matchSpecialty || matchClinic || matchNotes || matchCat
+      }
+      return true
+    })
+  }, [records, selectedRelationship, selectedCategory, searchQuery])
 
   const handleSaveRecord = async (recordData: Partial<IMedicalRecord>) => {
     const token = await getToken()
@@ -99,7 +150,7 @@ export default function DashboardPage() {
     await loadRecords()
   }
 
-  if (authLoading || !user) {
+  if (authInitializing || (!user && authInitializing)) {
     return (
       <div className="min-h-screen bg-[#F8F9F7] flex flex-col items-center justify-center gap-3">
         <Loader2 className="w-8 h-8 animate-spin text-[#8F1D2C]" />
@@ -107,6 +158,8 @@ export default function DashboardPage() {
       </div>
     )
   }
+
+  if (!user) return null
 
   return (
     <div className="min-h-screen bg-[#F8F9F7] text-[#17201D] font-sans pb-16 w-full max-w-full overflow-x-hidden">
@@ -116,13 +169,13 @@ export default function DashboardPage() {
           setActiveRecord(null)
           setIsModalOpen(true)
         }}
-        isNavigating={loadingRecords}
+        isNavigating={isSearching}
         activeTab={activeTab}
         onTabChange={(tab) => setActiveTab(tab)}
       />
 
       <main className="max-w-4xl mx-auto px-3 sm:px-4 pt-3 sm:pt-4 space-y-3.5 sm:space-y-4 w-full min-w-0">
-        {/* Mobile Quick Navigation Bar */}
+        {/* Mobile Navigation Tabs */}
         <div className="md:hidden bg-white p-1 sm:p-1.5 rounded-2xl border border-slate-200 shadow-xs flex items-center justify-between gap-1 overflow-x-auto no-scrollbar w-full min-w-0">
           <button
             onClick={() => setActiveTab('all')}
@@ -170,6 +223,14 @@ export default function DashboardPage() {
           </button>
         </div>
 
+        {/* Error Alert Banner */}
+        {fetchError && (
+          <div className="p-3 bg-[#F8E9EC] border border-[#8F1D2C]/30 rounded-xl text-xs text-[#8F1D2C] flex items-center gap-2">
+            <AlertCircle className="w-4 h-4 shrink-0" />
+            <span className="font-semibold">{fetchError}</span>
+          </div>
+        )}
+
         {/* Search & Filter Bar */}
         <div className="space-y-2 sm:space-y-2.5 w-full min-w-0">
           <div className="relative flex items-center gap-2 w-full min-w-0">
@@ -180,8 +241,11 @@ export default function DashboardPage() {
                 placeholder="Search doctor, patient, medicine, specialty..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full min-w-0 pl-9 pr-3 py-2 bg-white border border-slate-200 rounded-xl text-xs text-[#17201D] placeholder:text-slate-400 focus:outline-none focus:border-[#8F1D2C] shadow-xs transition-colors"
+                className="w-full min-w-0 pl-9 pr-8 py-2 bg-white border border-slate-200 rounded-xl text-xs text-[#17201D] placeholder:text-slate-400 focus:outline-none focus:border-[#8F1D2C] shadow-xs transition-colors"
               />
+              {isSearching && (
+                <Loader2 className="w-3.5 h-3.5 animate-spin text-[#8F1D2C] absolute right-3 top-1/2 -translate-y-1/2" />
+              )}
             </div>
 
             <button
@@ -241,24 +305,24 @@ export default function DashboardPage() {
         {/* Medical Timeline View */}
         {activeTab === 'timeline' ? (
           <MedicalTimeline
-            records={records}
+            records={filteredRecords}
             onSelectRecord={(rec) => {
               setActiveRecord(rec)
               setIsModalOpen(true)
             }}
           />
-        ) : loadingRecords ? (
+        ) : loadingRecords && !initialFetchDone ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full">
-            {[1, 2, 3, 4].map((n) => (
+            {[1, 2].map((n) => (
               <div
                 key={n}
                 className="h-28 bg-white border border-slate-200 rounded-xl animate-pulse w-full"
               />
             ))}
           </div>
-        ) : records.length > 0 ? (
+        ) : filteredRecords.length > 0 ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full">
-            {records.map((rec) => (
+            {filteredRecords.map((rec) => (
               <RecordCard
                 key={rec._id}
                 record={rec}
@@ -278,22 +342,36 @@ export default function DashboardPage() {
 
             <div className="space-y-1">
               <h3 className="text-base font-extrabold text-[#17201D]">
-                Your medical history starts here
+                {searchQuery.trim() || selectedRelationship !== 'All' || selectedCategory !== 'All'
+                  ? 'No matching records found'
+                  : 'Your medical history starts here'}
               </h3>
               <p className="text-xs text-[#68736F] leading-relaxed max-w-xs mx-auto">
-                Add your first prescription or medical record to keep everything organized for you and your family.
+                {searchQuery.trim() || selectedRelationship !== 'All' || selectedCategory !== 'All'
+                  ? 'Try clearing your search query or filter pills to see all medical records.'
+                  : 'Add your first prescription or medical record to keep everything organized for you and your family.'}
               </p>
             </div>
 
             <button
               onClick={() => {
-                setActiveRecord(null)
-                setIsModalOpen(true)
+                if (searchQuery.trim() || selectedRelationship !== 'All' || selectedCategory !== 'All') {
+                  setSearchQuery('')
+                  setSelectedRelationship('All')
+                  setSelectedCategory('All')
+                } else {
+                  setActiveRecord(null)
+                  setIsModalOpen(true)
+                }
               }}
               className="inline-flex items-center gap-2 px-5 py-2.5 bg-[#8F1D2C] hover:bg-[#741522] text-white font-bold text-xs rounded-full transition-all shadow-xs hover:scale-105"
             >
               <Plus className="w-4 h-4" />
-              <span>Add First Record</span>
+              <span>
+                {searchQuery.trim() || selectedRelationship !== 'All' || selectedCategory !== 'All'
+                  ? 'Clear Search & Filters'
+                  : 'Add First Record'}
+              </span>
             </button>
           </div>
         )}
@@ -303,6 +381,7 @@ export default function DashboardPage() {
       <RecordModal
         isOpen={isModalOpen}
         record={activeRecord}
+        existingRecords={records}
         onClose={() => setIsModalOpen(false)}
         onSave={handleSaveRecord}
         onDelete={handleDeleteRecord}

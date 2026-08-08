@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { IMedicalRecord } from '@/lib/api'
 import { DocumentScanner } from './DocumentScanner'
 import { LightboxViewer } from './LightboxViewer'
@@ -18,11 +18,14 @@ import {
   ZoomIn,
   ImageOff,
   ArrowLeft,
+  Check,
+  Plus,
 } from 'lucide-react'
 
 interface RecordModalProps {
   isOpen: boolean
   record?: IMedicalRecord | null
+  existingRecords?: IMedicalRecord[]
   onClose: () => void
   onSave: (recordData: Partial<IMedicalRecord>) => Promise<void>
   onDelete?: (id: string) => Promise<void>
@@ -30,9 +33,37 @@ interface RecordModalProps {
 
 type ModalMode = 'VIEW' | 'EDIT' | 'CREATE'
 
+const DEFAULT_SPECIALTIES = [
+  'General Medicine',
+  'Cardiology',
+  'Dermatology',
+  'Dentistry',
+  'Pediatrics',
+  'Orthopedics',
+  'Neurology',
+  'ENT / Otolaryngology',
+  'Ophthalmology',
+  'Gynecology & Obstetrics',
+  'Psychiatry',
+  'Endocrinology',
+  'Gastroenterology',
+  'Urology',
+  'Pulmonology',
+]
+
+const DEFAULT_CLINICS = [
+  'City Care Clinic',
+  'Apollo Hospital',
+  'General Hospital',
+  'Medicare Specialty Center',
+  'Community Health Clinic',
+  'Lifeline Medical Center',
+]
+
 export function RecordModal({
   isOpen,
   record,
+  existingRecords = [],
   onClose,
   onSave,
   onDelete,
@@ -48,18 +79,78 @@ export function RecordModal({
   const [visitDate, setVisitDate] = useState('')
   const [prescriptionDate, setPrescriptionDate] = useState('')
   const [category, setCategory] = useState('General')
-  const [medicinesOrNotes, setMedicinesOrNotes] = useState('')
   const [imageRef, setImageRef] = useState<{
     url?: string
     thumbnail?: string
     dimensions?: { width?: number; height?: number }
   }>({})
 
+  // Structured Medicines & Clinical Notes (Phase 4)
+  const [medicineInput, setMedicineInput] = useState('')
+  const [dosageInput, setDosageInput] = useState('')
+  const [medicinesList, setMedicinesList] = useState<{ name: string; dosage: string }[]>([])
+  const [clinicalNotes, setClinicalNotes] = useState('')
+
+  // Autocomplete Suggestions State
+  const [showSpecialtySuggestions, setShowSpecialtySuggestions] = useState(false)
+  const [showClinicSuggestions, setShowClinicSuggestions] = useState(false)
+  const [showDoctorSuggestions, setShowDoctorSuggestions] = useState(false)
+
+  const specialtyRef = useRef<HTMLDivElement>(null)
+  const clinicRef = useRef<HTMLDivElement>(null)
+  const doctorRef = useRef<HTMLDivElement>(null)
+
   const [isSaving, setIsSaving] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
-
-  // Lightbox State
   const [isLightboxOpen, setIsLightboxOpen] = useState(false)
+
+  // Click away listener for suggestions
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (specialtyRef.current && !specialtyRef.current.contains(event.target as Node)) {
+        setShowSpecialtySuggestions(false)
+      }
+      if (clinicRef.current && !clinicRef.current.contains(event.target as Node)) {
+        setShowClinicSuggestions(false)
+      }
+      if (doctorRef.current && !doctorRef.current.contains(event.target as Node)) {
+        setShowDoctorSuggestions(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
+
+  // User-specific suggestions from user's own existing records
+  const userSpecialties = Array.from(
+    new Set(
+      [...DEFAULT_SPECIALTIES, ...existingRecords.map((r) => r.doctorSpecialty).filter(Boolean)] as string[]
+    )
+  )
+
+  const userClinics = Array.from(
+    new Set(
+      [...DEFAULT_CLINICS, ...existingRecords.map((r) => r.clinicLocation).filter(Boolean)] as string[]
+    )
+  )
+
+  const userDoctors = Array.from(
+    new Set(
+      existingRecords.map((r) => r.doctorName).filter(Boolean) as string[]
+    )
+  )
+
+  const filteredSpecialties = userSpecialties.filter((s) =>
+    s.toLowerCase().includes(doctorSpecialty.toLowerCase())
+  )
+
+  const filteredClinics = userClinics.filter((c) =>
+    c.toLowerCase().includes(clinicLocation.toLowerCase())
+  )
+
+  const filteredDoctors = userDoctors.filter((d) =>
+    d.toLowerCase().includes(doctorName.toLowerCase())
+  )
 
   useEffect(() => {
     if (record) {
@@ -74,8 +165,12 @@ export function RecordModal({
         record.prescriptionDate ? record.prescriptionDate.substring(0, 10) : ''
       )
       setCategory(record.category || 'General')
-      setMedicinesOrNotes(record.medicinesOrNotes || '')
       setImageRef(record.imageRef || {})
+
+      // Parse medicinesOrNotes if structured or plain string
+      const notesRaw = record.medicinesOrNotes || ''
+      setClinicalNotes(notesRaw)
+      setMedicinesList([])
     } else {
       setMode('CREATE')
       setPatientName('')
@@ -86,7 +181,8 @@ export function RecordModal({
       setVisitDate(new Date().toISOString().substring(0, 10))
       setPrescriptionDate('')
       setCategory('General')
-      setMedicinesOrNotes('')
+      setClinicalNotes('')
+      setMedicinesList([])
       setImageRef({})
     }
     setIsLightboxOpen(false)
@@ -94,12 +190,38 @@ export function RecordModal({
 
   if (!isOpen) return null
 
+  const handleAddMedicine = () => {
+    if (!medicineInput.trim()) return
+    setMedicinesList([
+      ...medicinesList,
+      { name: medicineInput.trim(), dosage: dosageInput.trim() },
+    ])
+    setMedicineInput('')
+    setDosageInput('')
+  }
+
+  const handleRemoveMedicine = (index: number) => {
+    setMedicinesList(medicinesList.filter((_, i) => i !== index))
+  }
+
+  const serializeMedicinesAndNotes = (): string => {
+    const medText = medicinesList.map((m) => `• ${m.name}${m.dosage ? ` (${m.dosage})` : ''}`).join('\n')
+    if (medText && clinicalNotes.trim()) {
+      return `Prescribed Medicines:\n${medText}\n\nClinical Notes & Diagnosis:\n${clinicalNotes.trim()}`
+    } else if (medText) {
+      return `Prescribed Medicines:\n${medText}`
+    } else {
+      return clinicalNotes.trim()
+    }
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!patientName.trim()) return
 
     setIsSaving(true)
     try {
+      const combinedNotes = serializeMedicinesAndNotes()
       await onSave({
         _id: record?._id,
         patientName: patientName.trim(),
@@ -110,7 +232,7 @@ export function RecordModal({
         visitDate: visitDate || undefined,
         prescriptionDate: prescriptionDate || undefined,
         category,
-        medicinesOrNotes: medicinesOrNotes.trim(),
+        medicinesOrNotes: combinedNotes,
         imageRef,
       })
       onClose()
@@ -253,13 +375,13 @@ export function RecordModal({
               )}
 
               {/* Medicines / Clinical Notes */}
-              {medicinesOrNotes && (
+              {clinicalNotes && (
                 <div className="space-y-1">
                   <span className="text-[11px] font-bold text-[#17201D] block">
                     Medicines & Clinical Notes
                   </span>
                   <div className="p-3 bg-white border border-slate-200 rounded-xl text-xs text-[#17201D] leading-relaxed whitespace-pre-line">
-                    {medicinesOrNotes}
+                    {clinicalNotes}
                   </div>
                 </div>
               )}
@@ -367,9 +489,10 @@ export function RecordModal({
                 </div>
               </div>
 
-              {/* Doctor & Specialty */}
+              {/* Doctor & Specialty with Autocomplete Suggestions */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                <div>
+                {/* Doctor Name */}
+                <div className="relative" ref={doctorRef}>
                   <label className="block text-xs font-semibold text-[#17201D] mb-1">
                     Doctor Name
                   </label>
@@ -377,11 +500,35 @@ export function RecordModal({
                     type="text"
                     placeholder="e.g. Dr. Sarah Jenkins"
                     value={doctorName}
-                    onChange={(e) => setDoctorName(e.target.value)}
+                    onFocus={() => setShowDoctorSuggestions(true)}
+                    onChange={(e) => {
+                      setDoctorName(e.target.value)
+                      setShowDoctorSuggestions(true)
+                    }}
                     className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs text-[#17201D] focus:outline-none focus:border-[#8F1D2C]"
                   />
+                  {showDoctorSuggestions && filteredDoctors.length > 0 && (
+                    <div className="absolute top-full left-0 right-0 z-30 mt-1 bg-white border border-slate-200 rounded-xl shadow-lg max-h-36 overflow-y-auto py-1">
+                      {filteredDoctors.map((doc) => (
+                        <button
+                          type="button"
+                          key={doc}
+                          onClick={() => {
+                            setDoctorName(doc)
+                            setShowDoctorSuggestions(false)
+                          }}
+                          className="w-full px-3 py-1.5 text-left text-xs hover:bg-[#F8E9EC] hover:text-[#8F1D2C] text-[#17201D] font-medium transition-colors flex items-center justify-between"
+                        >
+                          <span>{doc}</span>
+                          <Check className="w-3 h-3 text-[#20A878] opacity-60" />
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
-                <div>
+
+                {/* Doctor Specialty Autocomplete */}
+                <div className="relative" ref={specialtyRef}>
                   <label className="block text-xs font-semibold text-[#17201D] mb-1">
                     Specialty
                   </label>
@@ -389,26 +536,71 @@ export function RecordModal({
                     type="text"
                     placeholder="e.g. Cardiology"
                     value={doctorSpecialty}
-                    onChange={(e) => setDoctorSpecialty(e.target.value)}
+                    onFocus={() => setShowSpecialtySuggestions(true)}
+                    onChange={(e) => {
+                      setDoctorSpecialty(e.target.value)
+                      setShowSpecialtySuggestions(true)
+                    }}
                     className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs text-[#17201D] focus:outline-none focus:border-[#8F1D2C]"
                   />
+                  {showSpecialtySuggestions && filteredSpecialties.length > 0 && (
+                    <div className="absolute top-full left-0 right-0 z-30 mt-1 bg-white border border-slate-200 rounded-xl shadow-lg max-h-40 overflow-y-auto py-1">
+                      {filteredSpecialties.map((spec) => (
+                        <button
+                          type="button"
+                          key={spec}
+                          onClick={() => {
+                            setDoctorSpecialty(spec)
+                            setShowSpecialtySuggestions(false)
+                          }}
+                          className="w-full px-3 py-1.5 text-left text-xs hover:bg-[#F8E9EC] hover:text-[#8F1D2C] text-[#17201D] font-medium transition-colors flex items-center justify-between"
+                        >
+                          <span>{spec}</span>
+                          <Check className="w-3 h-3 text-[#20A878] opacity-60" />
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
 
-              {/* Clinic & Category */}
+              {/* Clinic & Category with Autocomplete */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                <div>
+                <div className="relative" ref={clinicRef}>
                   <label className="block text-xs font-semibold text-[#17201D] mb-1">
                     Clinic / Hospital Location
                   </label>
                   <input
                     type="text"
-                    placeholder="e.g. City Care Clinic"
+                    placeholder="e.g. Apollo Hospital"
                     value={clinicLocation}
-                    onChange={(e) => setClinicLocation(e.target.value)}
+                    onFocus={() => setShowClinicSuggestions(true)}
+                    onChange={(e) => {
+                      setClinicLocation(e.target.value)
+                      setShowClinicSuggestions(true)
+                    }}
                     className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs text-[#17201D] focus:outline-none focus:border-[#8F1D2C]"
                   />
+                  {showClinicSuggestions && filteredClinics.length > 0 && (
+                    <div className="absolute top-full left-0 right-0 z-30 mt-1 bg-white border border-slate-200 rounded-xl shadow-lg max-h-40 overflow-y-auto py-1">
+                      {filteredClinics.map((clinic) => (
+                        <button
+                          type="button"
+                          key={clinic}
+                          onClick={() => {
+                            setClinicLocation(clinic)
+                            setShowClinicSuggestions(false)
+                          }}
+                          className="w-full px-3 py-1.5 text-left text-xs hover:bg-[#F8E9EC] hover:text-[#8F1D2C] text-[#17201D] font-medium transition-colors flex items-center justify-between"
+                        >
+                          <span>{clinic}</span>
+                          <Check className="w-3 h-3 text-[#20A878] opacity-60" />
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
+
                 <div>
                   <label className="block text-xs font-semibold text-[#17201D] mb-1">
                     Category
@@ -452,21 +644,80 @@ export function RecordModal({
                 </div>
               </div>
 
-              {/* Medicines & Notes */}
-              <div>
-                <label className="block text-xs font-semibold text-[#17201D] mb-1">
-                  Medicines / Clinical Notes
-                </label>
-                <textarea
-                  rows={3}
-                  placeholder="e.g. Prescribed Amoxicillin 500mg (3x daily)..."
-                  value={medicinesOrNotes}
-                  onChange={(e) => setMedicinesOrNotes(e.target.value)}
-                  className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs text-[#17201D] focus:outline-none focus:border-[#8F1D2C] resize-none"
-                />
+              {/* Phase 4: Prescribed Medicines & Clinical Notes Structure */}
+              <div className="space-y-3 bg-[#F8F9F7] p-3 rounded-xl border border-slate-200">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold text-[#17201D] flex items-center gap-1.5">
+                    <Pill className="w-3.5 h-3.5 text-[#8F1D2C]" />
+                    <span>Prescribed Medicines</span>
+                  </label>
+                  <span className="text-[10px] text-[#68736F] font-semibold">Structured Entry</span>
+                </div>
+
+                {/* Quick Add Medicine Row */}
+                <div className="flex items-center gap-1.5">
+                  <input
+                    type="text"
+                    placeholder="Medicine (e.g. Amoxicillin)"
+                    value={medicineInput}
+                    onChange={(e) => setMedicineInput(e.target.value)}
+                    className="flex-1 min-w-0 px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg text-xs focus:outline-none focus:border-[#8F1D2C]"
+                  />
+                  <input
+                    type="text"
+                    placeholder="Dosage (500mg 3x/day)"
+                    value={dosageInput}
+                    onChange={(e) => setDosageInput(e.target.value)}
+                    className="w-32 sm:w-36 px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg text-xs focus:outline-none focus:border-[#8F1D2C]"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleAddMedicine}
+                    className="px-2.5 py-1.5 bg-[#8F1D2C] hover:bg-[#741522] text-white rounded-lg text-xs font-bold flex items-center gap-1 shrink-0"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>Add</span>
+                  </button>
+                </div>
+
+                {/* Medicines List Badges */}
+                {medicinesList.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5 pt-1">
+                    {medicinesList.map((m, idx) => (
+                      <span
+                        key={idx}
+                        className="inline-flex items-center gap-1 px-2.5 py-1 bg-white border border-slate-200 rounded-lg text-xs font-medium text-[#17201D]"
+                      >
+                        <span className="font-bold text-[#8F1D2C]">{m.name}</span>
+                        {m.dosage && <span className="text-[#68736F] text-[11px]">({m.dosage})</span>}
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveMedicine(idx)}
+                          className="text-slate-400 hover:text-rose-600 ml-0.5"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                )}
+
+                {/* Clinical Notes & Advice Textarea */}
+                <div>
+                  <label className="block text-[11px] font-semibold text-[#68736F] mb-1">
+                    Clinical Notes & Diagnosis / Advice
+                  </label>
+                  <textarea
+                    rows={2}
+                    placeholder="e.g. Diagnosis: Acute Pharyngitis. Advice: Drink warm water, rest for 5 days..."
+                    value={clinicalNotes}
+                    onChange={(e) => setClinicalNotes(e.target.value)}
+                    className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs text-[#17201D] focus:outline-none focus:border-[#8F1D2C] resize-none"
+                  />
+                </div>
               </div>
 
-              {/* Document Scanner Component */}
+              {/* Document Scanner Component (Preserving ImageKit Upload) */}
               <DocumentScanner
                 initialImage={imageRef}
                 onImageCaptured={(scannedImg) => setImageRef(scannedImg)}

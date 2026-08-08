@@ -42,7 +42,10 @@ export async function fetchWithAuth(
 
   const data = await response.json()
   if (!response.ok) {
-    throw new Error(data?.error?.message || 'API request failed.')
+    const errorMsg = data?.error?.message || 'API request failed.'
+    const error = new Error(errorMsg) as Error & { status?: number }
+    error.status = response.status
+    throw error
   }
 
   return data
