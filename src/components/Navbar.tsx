@@ -169,13 +169,21 @@ export function Navbar({
               </>
             ) : (
               !loading && (
-                <Link
-                  href="/login"
-                  className="flex items-center gap-1.5 px-4 py-2 bg-[#8F1D2C] hover:bg-[#741522] text-white text-xs font-bold rounded-full shadow-xs transition-all hover:scale-105 shrink-0"
-                >
-                  <LogIn className="w-3.5 h-3.5 text-white" />
-                  <span>Sign In</span>
-                </Link>
+                <div className="flex items-center gap-2 shrink-0">
+                  <Link
+                    href="/login"
+                    className="flex items-center gap-1.5 px-4 py-2 bg-[#8F1D2C] hover:bg-[#741522] text-white text-xs font-bold rounded-full shadow-xs transition-all hover:scale-105 shrink-0"
+                  >
+                    <span>Sign In</span>
+                  </Link>
+
+                  <Link
+                    href="/register"
+                    className="hidden sm:flex items-center gap-1.5 px-4 py-2 border border-[#3B988E] hover:bg-[#3B988E]/10 text-[#3B988E] text-xs font-bold rounded-full transition-all shrink-0"
+                  >
+                    <span>Get Started</span>
+                  </Link>
+                </div>
               )
             )}
           </div>

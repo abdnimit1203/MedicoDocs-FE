@@ -437,8 +437,6 @@ export default function DashboardPage() {
         onSave={handleSaveRecord}
         onDelete={handleDeleteRecord}
       />
-
-      <Footer />
     </div>
   )
 }

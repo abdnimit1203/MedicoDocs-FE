@@ -2,7 +2,7 @@
 
 import React from 'react'
 import { IMedicalRecord } from '@/lib/api'
-import { Calendar, User, Stethoscope, MapPin, Image as ImageIcon } from 'lucide-react'
+import { Calendar, User, Stethoscope, MapPin, Image as ImageIcon, Pill } from 'lucide-react'
 
 interface RecordCardProps {
   record: IMedicalRecord
@@ -81,11 +81,14 @@ export function RecordCard({ record, onClick }: RecordCardProps) {
           </div>
         )}
 
-        {/* Notes Preview */}
+        {/* Medicines / Notes Preview */}
         {record.medicinesOrNotes && (
-          <p className="text-[11px] text-[#68736F] line-clamp-2 bg-[#F8F9F7] rounded-lg px-2 py-1 mb-2 border border-slate-200 min-w-0">
-            {record.medicinesOrNotes}
-          </p>
+          <div className="flex items-start gap-1.5 bg-[#F8E9EC]/50 border border-[#8F1D2C]/15 rounded-lg p-2 mb-2 min-w-0">
+            <Pill className="w-3.5 h-3.5 text-[#8F1D2C] shrink-0 mt-0.5" />
+            <p className="text-[11px] text-[#17201D] font-medium line-clamp-2 min-w-0 leading-tight">
+              {record.medicinesOrNotes}
+            </p>
+          </div>
         )}
       </div>
 

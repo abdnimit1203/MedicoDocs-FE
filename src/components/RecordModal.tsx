@@ -609,13 +609,41 @@ export function RecordModal({
                 </div>
               )}
 
-              {/* Medicines / Clinical Notes */}
-              {clinicalNotes && (
-                <div className="space-y-1">
-                  <span className="text-[11px] font-bold text-[#17201D] block">
-                    Notes & Clinical Details
+              {/* Prescribed Medicines (List Boxed Cards in View Mode) */}
+              {medicinesList.length > 0 && (
+                <div className="space-y-2">
+                  <span className="text-[11px] font-bold text-[#17201D] flex items-center gap-1.5">
+                    <Pill className="w-3.5 h-3.5 text-[#8F1D2C]" />
+                    <span>Prescribed Medicines ({medicinesList.length})</span>
                   </span>
-                  <div className="p-3 bg-white border border-slate-200 rounded-xl text-xs text-[#17201D] leading-relaxed whitespace-pre-line">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {medicinesList.map((med, idx) => (
+                      <div
+                        key={idx}
+                        className="p-2.5 bg-[#F8E9EC]/70 border border-[#8F1D2C]/20 rounded-xl flex items-start gap-2 text-xs shadow-2xs"
+                      >
+                        <Pill className="w-4 h-4 text-[#8F1D2C] shrink-0 mt-0.5" />
+                        <div className="min-w-0">
+                          <span className="font-extrabold text-[#8F1D2C] block truncate">{med.name}</span>
+                          {med.dosage && (
+                            <span className="text-[11px] font-semibold text-[#68736F] block mt-0.5">
+                              {med.dosage}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Diagnosis / Clinical Notes & Advice (View Mode) */}
+              {clinicalNotes && (
+                <div className="space-y-1.5">
+                  <span className="text-[11px] font-bold text-[#17201D] block">
+                    Diagnosis / Clinical Notes & Advice
+                  </span>
+                  <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl text-xs sm:text-sm text-[#17201D] leading-relaxed whitespace-pre-line font-medium shadow-2xs">
                     {clinicalNotes}
                   </div>
                 </div>
@@ -649,12 +677,12 @@ export function RecordModal({
                       type="button"
                       onClick={handleAnalyzeWithGemini}
                       disabled={isAnalyzing}
-                      className="w-full py-2.5 bg-gradient-to-r from-[#8F1D2C] to-[#3B988E] hover:opacity-95 text-white font-bold text-xs rounded-xl shadow-xs transition-all flex items-center justify-center gap-2"
+                      className="w-full py-2.5 px-4 bg-gradient-to-r from-[#8F1D2C] via-[#741522] to-[#3B988E] hover:opacity-95 text-white font-bold text-xs rounded-xl shadow-xs transition-all flex items-center justify-center gap-2"
                     >
                       {isAnalyzing ? (
                         <>
                           <Loader2 className="w-4 h-4 animate-spin text-white" />
-                          <span>Analyzing document with Gemini AI...</span>
+                          <span>Analyzing with Gemini AI...</span>
                         </>
                       ) : (
                         <>
@@ -669,9 +697,8 @@ export function RecordModal({
                     </button>
                   </div>
                 ) : (
-                  <div className="py-6 rounded-xl border border-dashed border-slate-200 bg-[#F8F9F7] text-center space-y-1 text-[#68736F]">
-                    <ImageOff className="w-6 h-6 text-slate-300 mx-auto" />
-                    <p className="text-xs font-semibold">No document image attached</p>
+                  <div className="p-4 rounded-xl border border-dashed border-slate-300 bg-slate-50 text-center text-xs text-[#68736F]">
+                    No prescription or document image attached.
                   </div>
                 )}
               </div>
@@ -709,44 +736,30 @@ export function RecordModal({
             /* MODE 2 & 3: FORM INPUT MODE (CREATE or EDIT)           */
             /* ====================================================== */
             <form onSubmit={handleSubmit} className="p-4 space-y-4 overflow-y-auto flex-1 w-full max-w-full">
-              {/* Gemini AI Status Banners */}
-              {aiSuccessMessage && (
-                <div className="p-3 bg-[#E6F4F2] border border-[#3B988E]/30 rounded-xl text-xs text-[#17201D] space-y-1">
-                  <div className="flex items-start gap-2 font-bold text-[#3B988E]">
-                    <CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5 text-[#20A878]" />
-                    <span>{aiSuccessMessage}</span>
+              {/* Top AI Scan Banner in Edit Mode if Image Exists */}
+              {hasImage && (
+                <div className="p-3 bg-gradient-to-r from-[#F8E9EC] via-[#E6F4F2] to-slate-50 border border-[#8F1D2C]/20 rounded-xl space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-[#8F1D2C] flex items-center gap-1.5">
+                      <Sparkles className="w-4 h-4 text-[#8F1D2C]" />
+                      <span>Gemini 3.6 Flash AI Intelligence</span>
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setIsLightboxOpen(true)}
+                      className="text-[11px] font-bold text-[#3B988E] hover:underline"
+                    >
+                      View Image
+                    </button>
                   </div>
-                  {uncertainFields.length > 0 && (
-                    <p className="text-[11px] text-amber-700 bg-amber-50 p-1.5 rounded-lg border border-amber-200 mt-1">
-                      ⚠️ Note: Some fields could not be read with 100% confidence ({uncertainFields.join(', ')}). Please verify them.
-                    </p>
-                  )}
-                </div>
-              )}
-
-              {aiErrorMessage && (
-                <div className="p-3 bg-[#F8E9EC] border border-[#8F1D2C]/30 rounded-xl text-xs text-[#8F1D2C] flex items-start gap-2">
-                  <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
-                  <div>
-                    <span className="font-bold block">Gemini AI Error:</span>
-                    <span>{aiErrorMessage}</span>
-                  </div>
-                </div>
-              )}
-
-              {/* Document Upload & Gemini Scan Button */}
-              <div className="space-y-2">
-                <DocumentScanner
-                  initialImage={imageRef}
-                  onImageCaptured={(scannedImg) => setImageRef(scannedImg)}
-                />
-
-                {hasImage && (
+                  <p className="text-[11px] text-[#68736F] leading-tight">
+                    Scan prescription or lab report images to auto-populate medicine lists and diagnostic details below.
+                  </p>
                   <button
                     type="button"
                     onClick={handleAnalyzeWithGemini}
                     disabled={isAnalyzing}
-                    className="w-full py-2.5 bg-gradient-to-r from-[#8F1D2C] to-[#3B988E] hover:opacity-95 text-white font-bold text-xs rounded-xl shadow-xs transition-all flex items-center justify-center gap-2"
+                    className="w-full py-2 px-3 bg-[#8F1D2C] hover:bg-[#741522] text-white font-bold text-xs rounded-lg shadow-xs transition-all flex items-center justify-center gap-2"
                   >
                     {isAnalyzing ? (
                       <>
@@ -764,8 +777,8 @@ export function RecordModal({
                       </>
                     )}
                   </button>
-                )}
-              </div>
+                </div>
+              )}
 
               {/* Patient Name & Relationship */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
@@ -1089,22 +1102,28 @@ export function RecordModal({
                     </div>
 
                     {medicinesList.length > 0 && (
-                      <div className="flex flex-wrap gap-1.5 pt-1">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
                         {medicinesList.map((m, idx) => (
-                          <span
+                          <div
                             key={idx}
-                            className="inline-flex items-center gap-1 px-2.5 py-1 bg-white border border-slate-200 rounded-lg text-xs font-medium text-[#17201D]"
+                            className="flex items-center justify-between p-2.5 bg-white border border-slate-200 rounded-xl text-xs shadow-2xs"
                           >
-                            <span className="font-bold text-[#8F1D2C]">{m.name}</span>
-                            {m.dosage && <span className="text-[#68736F] text-[11px]">({m.dosage})</span>}
+                            <div className="flex items-center gap-2 min-w-0">
+                              <Pill className="w-3.5 h-3.5 text-[#8F1D2C] shrink-0" />
+                              <div className="min-w-0">
+                                <span className="font-bold text-[#17201D] block truncate">{m.name}</span>
+                                {m.dosage && <span className="text-[11px] text-[#68736F] block">{m.dosage}</span>}
+                              </div>
+                            </div>
                             <button
                               type="button"
                               onClick={() => handleRemoveMedicine(idx)}
-                              className="text-slate-400 hover:text-rose-600 ml-0.5"
+                              className="p-1 rounded-md text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors shrink-0"
+                              title="Remove item"
                             >
-                              <X className="w-3 h-3" />
+                              <X className="w-3.5 h-3.5" />
                             </button>
-                          </span>
+                          </div>
                         ))}
                       </div>
                     )}
@@ -1114,15 +1133,15 @@ export function RecordModal({
 
               {/* Diagnosis / Clinical Notes Textarea */}
               <div>
-                <label className="block text-[11px] font-semibold text-[#68736F] mb-1">
+                <label className="block text-xs font-bold text-[#17201D] mb-1">
                   Diagnosis / Clinical Notes & Advice
                 </label>
                 <textarea
-                  rows={2}
-                  placeholder="e.g. Diagnosis, doctor instructions, or report summary..."
+                  rows={4}
+                  placeholder="e.g. Diagnosis details, doctor instructions, dosage schedule, or clinical advice..."
                   value={clinicalNotes}
                   onChange={(e) => setClinicalNotes(e.target.value)}
-                  className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs text-[#17201D] focus:outline-none focus:border-[#8F1D2C] resize-none"
+                  className="w-full px-3 py-2.5 bg-white border border-slate-300 rounded-xl text-xs sm:text-sm text-[#17201D] focus:outline-none focus:border-[#8F1D2C] focus:ring-4 focus:ring-[#8F1D2C]/10 leading-relaxed min-h-[120px] resize-y shadow-2xs font-medium placeholder:text-slate-400"
                 />
               </div>
 
