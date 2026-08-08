@@ -736,30 +736,47 @@ export function RecordModal({
             /* MODE 2 & 3: FORM INPUT MODE (CREATE or EDIT)           */
             /* ====================================================== */
             <form onSubmit={handleSubmit} className="p-4 space-y-4 overflow-y-auto flex-1 w-full max-w-full">
-              {/* Top AI Scan Banner in Edit Mode if Image Exists */}
-              {hasImage && (
-                <div className="p-3 bg-gradient-to-r from-[#F8E9EC] via-[#E6F4F2] to-slate-50 border border-[#8F1D2C]/20 rounded-xl space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-[#8F1D2C] flex items-center gap-1.5">
-                      <Sparkles className="w-4 h-4 text-[#8F1D2C]" />
-                      <span>Gemini 3.6 Flash AI Intelligence</span>
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => setIsLightboxOpen(true)}
-                      className="text-[11px] font-bold text-[#3B988E] hover:underline"
-                    >
-                      View Image
-                    </button>
+              {/* Gemini AI Status Banners */}
+              {aiSuccessMessage && (
+                <div className="p-3 bg-[#E6F4F2] border border-[#3B988E]/30 rounded-xl text-xs text-[#17201D] space-y-1">
+                  <div className="flex items-start gap-2 font-bold text-[#3B988E]">
+                    <CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5 text-[#20A878]" />
+                    <span>{aiSuccessMessage}</span>
                   </div>
-                  <p className="text-[11px] text-[#68736F] leading-tight">
-                    Scan prescription or lab report images to auto-populate medicine lists and diagnostic details below.
-                  </p>
+                  {uncertainFields.length > 0 && (
+                    <p className="text-[11px] text-amber-700 bg-amber-50 p-1.5 rounded-lg border border-amber-200 mt-1">
+                      ⚠️ Note: Some fields could not be read with 100% confidence ({uncertainFields.join(', ')}). Please verify them.
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {aiErrorMessage && (
+                <div className="p-3 bg-[#F8E9EC] border border-[#8F1D2C]/30 rounded-2xl text-xs text-[#8F1D2C] flex items-start gap-2">
+                  <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                  <div>
+                    <span className="font-bold block">Gemini AI Error:</span>
+                    <span>{aiErrorMessage}</span>
+                  </div>
+                </div>
+              )}
+
+              {/* Document Upload & Gemini Scan Button */}
+              <div className="space-y-2">
+                <label className="block text-xs font-bold text-[#17201D]">
+                  Attach Document Image / Prescription
+                </label>
+                <DocumentScanner
+                  initialImage={imageRef}
+                  onImageCaptured={(scannedImg) => setImageRef(scannedImg)}
+                />
+
+                {hasImage && (
                   <button
                     type="button"
                     onClick={handleAnalyzeWithGemini}
                     disabled={isAnalyzing}
-                    className="w-full py-2 px-3 bg-[#8F1D2C] hover:bg-[#741522] text-white font-bold text-xs rounded-lg shadow-xs transition-all flex items-center justify-center gap-2"
+                    className="w-full py-2.5 px-4 bg-gradient-to-r from-[#8F1D2C] via-[#741522] to-[#3B988E] hover:opacity-95 text-white font-bold text-xs rounded-xl shadow-xs transition-all flex items-center justify-center gap-2"
                   >
                     {isAnalyzing ? (
                       <>
@@ -777,8 +794,8 @@ export function RecordModal({
                       </>
                     )}
                   </button>
-                </div>
-              )}
+                )}
+              </div>
 
               {/* Patient Name & Relationship */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
