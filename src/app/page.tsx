@@ -11,29 +11,19 @@ import {
   FileText,
   Users,
   Clock,
-  Loader2,
   LogIn,
   UserPlus,
 } from 'lucide-react'
 
 export default function Home() {
-  const { user, loading: authLoading } = useAuth()
+  const { user, authInitializing } = useAuth()
   const router = useRouter()
 
   useEffect(() => {
-    if (user && !authLoading) {
-      router.push('/dashboard')
+    if (user && !authInitializing) {
+      router.replace('/dashboard')
     }
-  }, [user, authLoading, router])
-
-  if (authLoading) {
-    return (
-      <div className="min-h-screen bg-[#F8F9F7] flex flex-col items-center justify-center gap-3">
-        <Loader2 className="w-8 h-8 animate-spin text-[#8F1D2C]" />
-        <p className="text-xs font-semibold text-[#68736F]">Loading MedicoDocs...</p>
-      </div>
-    )
-  }
+  }, [user, authInitializing, router])
 
   return (
     <div className="min-h-screen bg-[#F8F9F7] text-[#17201D] font-sans flex flex-col justify-between w-full max-w-full overflow-x-hidden">
