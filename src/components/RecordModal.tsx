@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { useAuth } from '@/context/AuthContext'
 import { fetchWithAuth, IMedicalRecord, DocumentType, ITestResultItem } from '@/lib/api'
+import { toast } from 'react-hot-toast'
 import { DocumentScanner } from './DocumentScanner'
 import { LightboxViewer } from './LightboxViewer'
 import {
@@ -276,6 +277,7 @@ export function RecordModal({
               aiData.testResults?.length || 0
             } parameter measurement(s). Please review and edit before saving.`
           )
+          toast.success('✨ Gemini AI Test Report extraction complete!')
         } else {
           // Prescription Analysis
           if (aiData.doctorName) setDoctorName(aiData.doctorName)
@@ -308,6 +310,7 @@ export function RecordModal({
               aiData.medicines?.length || 0
             } medicine(s). Please review and edit before saving.`
           )
+          toast.success('✨ Gemini AI Prescription extraction complete!')
         }
 
         if (Array.isArray(aiData.uncertainFields)) {
@@ -318,9 +321,9 @@ export function RecordModal({
       }
     } catch (err: any) {
       console.error('Gemini AI Error:', err)
-      setAiErrorMessage(
-        err.message || 'Failed to analyze image with Gemini AI.'
-      )
+      const errText = err.message || 'Failed to analyze image with Gemini AI.'
+      setAiErrorMessage(errText)
+      toast.error(errText)
     } finally {
       setIsAnalyzing(false)
     }
@@ -376,7 +379,10 @@ export function RecordModal({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!patientName.trim()) return
+    if (!patientName.trim()) {
+      toast.error('Patient Name is required.')
+      return
+    }
 
     setIsSaving(true)
     try {
@@ -400,9 +406,11 @@ export function RecordModal({
         followUpDate: followUpDate || undefined,
         testResults,
       })
+      toast.success(record?._id ? 'Medical record updated successfully!' : 'Medical record created successfully!')
       onClose()
-    } catch (err) {
+    } catch (err: any) {
       console.error('Save record error:', err)
+      toast.error(err.message || 'Failed to save medical record.')
     } finally {
       setIsSaving(false)
     }
@@ -410,14 +418,16 @@ export function RecordModal({
 
   const handleDelete = async () => {
     if (!record?._id || !onDelete) return
-    if (!confirm('Are you sure you want to delete this record?')) return
+    if (!confirm('Are you sure you want to delete this medical record?')) return
 
     setIsDeleting(true)
     try {
       await onDelete(record._id)
+      toast.success('Medical record deleted successfully.')
       onClose()
-    } catch (err) {
+    } catch (err: any) {
       console.error('Delete record error:', err)
+      toast.error(err.message || 'Failed to delete medical record.')
     } finally {
       setIsDeleting(false)
     }

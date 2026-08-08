@@ -5,6 +5,7 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/context/AuthContext'
+import { toast } from 'react-hot-toast'
 import { User, Mail, Lock, Loader2, Plus } from 'lucide-react'
 
 function GoogleLogo({ className = 'w-5 h-5' }: { className?: string }) {
@@ -52,38 +53,48 @@ export default function RegisterPage() {
     setError('')
 
     if (!name.trim()) {
-      setError('Please enter your full name.')
+      const errText = 'Please enter your full name.'
+      setError(errText)
+      toast.error(errText)
       return
     }
 
     if (!email.trim()) {
-      setError('Please enter a valid email address.')
+      const errText = 'Please enter a valid email address.'
+      setError(errText)
+      toast.error(errText)
       return
     }
 
     if (password.length < 6) {
-      setError('Password must be at least 6 characters long.')
+      const errText = 'Password must be at least 6 characters long.'
+      setError(errText)
+      toast.error(errText)
       return
     }
 
     if (password !== confirmPassword) {
-      setError('Passwords do not match. Please re-enter your password.')
+      const errText = 'Passwords do not match. Please re-enter your password.'
+      setError(errText)
+      toast.error(errText)
       return
     }
 
     setIsSubmitting(true)
     try {
       await registerWithEmail(name.trim(), email.trim(), password)
+      toast.success('Account created successfully! Welcome to MedicoDocs.')
       router.replace('/dashboard')
     } catch (err: any) {
       const msg = err.message || ''
+      let userMsg = 'Failed to create account. Please try again.'
       if (msg.includes('email-already-in-use')) {
-        setError('An account with this email already exists. Please log in.')
+        userMsg = 'An account with this email already exists. Please log in.'
       } else if (msg.includes('invalid-email')) {
-        setError('Please enter a valid email address.')
-      } else {
-        setError(msg || 'Failed to create account. Please try again.')
+        userMsg = 'Please enter a valid email address.'
       }
+      setError(userMsg)
+      toast.error(userMsg)
     } finally {
       setIsSubmitting(false)
     }
@@ -94,9 +105,12 @@ export default function RegisterPage() {
     setIsSubmitting(true)
     try {
       await loginWithGoogle()
+      toast.success('Signed in with Google!')
       router.replace('/dashboard')
     } catch (err: any) {
-      setError(err.message || 'Google Sign-In failed.')
+      const msg = err.message || 'Google Sign-In failed.'
+      setError(msg)
+      toast.error(msg)
     } finally {
       setIsSubmitting(false)
     }
@@ -122,9 +136,8 @@ export default function RegisterPage() {
         </span>
       </Link>
 
-      {/* Main Reference Card */}
+      {/* Main Card */}
       <div className="bg-white border border-slate-100 shadow-sm rounded-3xl p-6 sm:p-8 w-full max-w-sm space-y-6">
-        {/* Top Circular User + Badge Header (Matching reference right screen!) */}
         <div className="text-center space-y-2">
           <div className="w-20 h-20 bg-[#E6F4F2] text-[#3B988E] rounded-full mx-auto flex items-center justify-center border border-[#3B988E]/10 shadow-xs relative">
             <User className="w-10 h-10 text-[#3B988E]" />
@@ -245,7 +258,7 @@ export default function RegisterPage() {
           </div>
         </div>
 
-        {/* Google Login with Official Multi-Color Google Logo */}
+        {/* Google Login */}
         <button
           type="button"
           onClick={handleGoogleSignIn}

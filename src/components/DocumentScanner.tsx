@@ -3,6 +3,7 @@
 import React, { useState, useRef } from 'react'
 import { useAuth } from '@/context/AuthContext'
 import { fetchWithAuth } from '@/lib/api'
+import { toast } from 'react-hot-toast'
 import { Camera, Upload, RotateCw, Check, X, Loader2, AlertCircle } from 'lucide-react'
 
 interface DocumentScannerProps {
@@ -107,12 +108,15 @@ export function DocumentScanner({ initialImage, onImageCaptured }: DocumentScann
           thumbnail: ikData.thumbnail || ikData.url,
           dimensions: ikData.dimensions || { width, height },
         })
+        toast.success('Document image uploaded to ImageKit!')
       } else {
         throw new Error(uploadRes.error?.message || 'ImageKit upload failed.')
       }
     } catch (err: any) {
       console.error('ImageKit upload error:', err)
-      setUploadError(err.message || 'Failed to upload image to ImageKit cloud CDN.')
+      const errText = err.message || 'Failed to upload image to ImageKit cloud CDN.'
+      setUploadError(errText)
+      toast.error(errText)
       setImageSrc(null)
       setThumbnailSrc(null)
       onImageCaptured({ url: '', thumbnail: '', dimensions: { width: 0, height: 0 } })

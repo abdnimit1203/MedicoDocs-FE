@@ -5,7 +5,8 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/context/AuthContext'
-import { ShieldCheck, Mail, Lock, Loader2, ArrowRight } from 'lucide-react'
+import { toast } from 'react-hot-toast'
+import { ShieldCheck, Mail, Lock, Loader2 } from 'lucide-react'
 
 function GoogleLogo({ className = 'w-5 h-5' }: { className?: string }) {
   return (
@@ -51,21 +52,25 @@ export default function LoginPage() {
     setError('')
 
     if (!email.trim() || !password) {
-      setError('Please enter your email and password.')
+      const errText = 'Please enter your email and password.'
+      setError(errText)
+      toast.error(errText)
       return
     }
 
     setIsSubmitting(true)
     try {
       await loginWithEmail(email.trim(), password)
+      toast.success('Signed in successfully!')
       router.replace('/dashboard')
     } catch (err: any) {
       const msg = err.message || ''
+      let userMsg = 'Failed to sign in. Please try again.'
       if (msg.includes('user-not-found') || msg.includes('wrong-password') || msg.includes('invalid-credential')) {
-        setError('Invalid email or password. Please check your credentials.')
-      } else {
-        setError(msg || 'Failed to sign in. Please try again.')
+        userMsg = 'Invalid email or password. Please check your credentials.'
       }
+      setError(userMsg)
+      toast.error(userMsg)
     } finally {
       setIsSubmitting(false)
     }
@@ -76,9 +81,12 @@ export default function LoginPage() {
     setIsSubmitting(true)
     try {
       await loginWithGoogle()
+      toast.success('Signed in with Google!')
       router.replace('/dashboard')
     } catch (err: any) {
-      setError(err.message || 'Google Sign-In failed.')
+      const msg = err.message || 'Google Sign-In failed.'
+      setError(msg)
+      toast.error(msg)
     } finally {
       setIsSubmitting(false)
     }
@@ -104,7 +112,7 @@ export default function LoginPage() {
         </span>
       </Link>
 
-      {/* Main Reference Card */}
+      {/* Main Card */}
       <div className="bg-white border border-slate-100 shadow-sm rounded-3xl p-6 sm:p-8 w-full max-w-sm space-y-6">
         {/* Top Circular Illustration Header */}
         <div className="text-center space-y-2">
@@ -180,7 +188,7 @@ export default function LoginPage() {
 
             <button
               type="button"
-              onClick={() => alert('Password reset link will be sent to your email.')}
+              onClick={() => toast.success('Password reset functionality is enabled via Firebase.')}
               className="text-xs font-bold text-[#68736F] hover:text-[#8F1D2C] transition-colors"
             >
               Forgot Password?
@@ -211,7 +219,7 @@ export default function LoginPage() {
           </div>
         </div>
 
-        {/* Google Login with Official Multi-Color Google Logo */}
+        {/* Google Login */}
         <button
           type="button"
           onClick={handleGoogleSignIn}

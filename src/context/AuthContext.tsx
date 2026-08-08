@@ -14,6 +14,7 @@ import {
 } from 'firebase/auth'
 import { auth, googleProvider } from '@/lib/firebase'
 import { fetchWithAuth } from '@/lib/api'
+import { toast } from 'react-hot-toast'
 
 export interface IDbUser {
   _id: string
@@ -135,7 +136,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUser(null)
       setDbUser(null)
       await firebaseSignOut(auth)
-      // Perform hard redirect to landing page to completely purge state & caches
+      toast.success('Signed out successfully.')
       window.location.href = '/'
     } catch (err) {
       console.error('Logout Error:', err)
